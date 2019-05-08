@@ -1,3 +1,4 @@
+import argparse
 import math
 import wave
 
@@ -7,13 +8,17 @@ import pygame
 
 import midi_utils
 
+import keras
+from keras.models import Model, load_model
+from keras import backend as K
+
 # User constants
 device = "cpu"
 dir_name = 'history/'
-sub_dir_name = 'e1/' #'e2000/'
+sub_dir_name = 'e1/'
 sample_rate = 48000
-note_dt = 2000  # Num Samples
-note_duration = 20000  # Num Samples
+note_dt = 2000  # num samples
+note_duration = 20000  # num samples
 note_decay = 5.0 / sample_rate
 num_params = 120
 num_measures = 16
@@ -102,7 +107,7 @@ def audio_callback(in_data, frame_count, time_info, status):
     # Check if paused
     if audio_pause and status is not None:
         data = np.zeros((frame_count,), dtype=np.float32)
-        return (data.tobytes(), pyaudio.paContinue)
+        return data.tobytes(), pyaudio.paContinue
 
     # Find and add any notes in this time window
     cur_dt = note_dt
@@ -154,51 +159,6 @@ def audio_callback(in_data, frame_count, time_info, status):
     return data.tobytes(), pyaudio.paContinue
 
 
-# Keras
-print("Loading Keras...")
-
-import keras
-
-print("Keras Version: " + keras.__version__)
-from keras.models import Model, load_model
-from keras import backend as K
-
-K.set_image_data_format('channels_first')
-
-print("Loading Encoder...")
-model = load_model(dir_name + 'model.h5')
-enc = K.function([model.get_layer('encoder').input, K.learning_phase()],
-                 [model.layers[-1].output])
-enc_model = Model(inputs=model.input, outputs=model.get_layer('pre_encoder').output)
-
-print("Loading Statistics...")
-means = np.load(dir_name + sub_dir_name + 'means.npy')
-evals = np.load(dir_name + sub_dir_name + 'evals.npy')
-evecs = np.load(dir_name + sub_dir_name + 'evecs.npy')
-stds = np.load(dir_name + sub_dir_name + 'stds.npy')
-
-print("Loading Songs...")
-y_samples = np.load('data/interim/samples.npy')
-y_lengths = np.load('data/interim/lengths.npy')
-
-# Open a window
-pygame.init()
-pygame.font.init()
-screen = pygame.display.set_mode((int(window_w), int(window_h)))
-notes_surface = screen.subsurface((notes_x, notes_y, notes_w, notes_h))
-pygame.display.set_caption('MusicEdit')
-font = pygame.font.SysFont("monospace", 15)
-
-# Start the audio stream
-audio_stream = audio.open(
-    format=audio.get_format_from_width(2),
-    channels=1,
-    rate=sample_rate,
-    output=True,
-    stream_callback=audio_callback)
-audio_stream.start_stream()
-
-
 def update_mouse_click(mouse_pos):
     global cur_slider_ix
     global cur_control_ix
@@ -244,7 +204,7 @@ def update_mouse_move(mouse_pos):
             apply_controls()
 
 
-def draw_controls():
+def draw_controls(screen):
     for i in range(control_num):
         x = controls_x + i * control_w + control_pad
         y = controls_y + control_pad
@@ -256,7 +216,7 @@ def draw_controls():
         pygame.draw.rect(screen, (0, 0, 0), (x, y, w, h), 1)
 
 
-def draw_sliders():
+def draw_sliders(screen):
     for i in range(slider_num):
         slider_color = slider_colors[i % len(slider_colors)]
         x = sliders_x + i * slider_w
@@ -297,7 +257,7 @@ def notes_to_img(notes):
     return np.transpose(output, (2, 1, 0))
 
 
-def draw_notes():
+def draw_notes(screen, notes_surface):
     pygame.surfarray.blit_array(notes_surface, notes_to_img(cur_notes))
 
     measure_ix = int(note_time / note_h)
@@ -308,133 +268,189 @@ def draw_notes():
     pygame.draw.rect(screen, (255, 255, 0), (x, y, 4, note_h), 0)
 
 
-# Main loop
-running = True
-rand_ix = 0
-cur_len = 0
-apply_controls()
-while running:
-    # Process events
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:  # QUIT BUTTON HIT
-            running = False
-            break
+def play():
+    global mouse_pressed
+    global cur_notes
+    global audio_pause
+    global needs_update
+    global cur_params
+    global prev_mouse_pos
+    global audio_reset
+    global instrument
 
-        elif event.type == pygame.MOUSEBUTTONDOWN:  # MOUSE BUTTON DOWN
-            if pygame.mouse.get_pressed()[0]:
-                prev_mouse_pos = pygame.mouse.get_pos()
-                update_mouse_click(prev_mouse_pos)
-                update_mouse_move(prev_mouse_pos)
-            elif pygame.mouse.get_pressed()[2]:
-                cur_params = np.zeros((num_params,), dtype=np.float32)
-                needs_update = True
+    print("Keras version: " + keras.__version__)
 
-        elif event.type == pygame.MOUSEBUTTONUP:   # MOUSE BUTTON UP
-            mouse_pressed = 0
-            prev_mouse_pos = None
+    K.set_image_data_format('channels_first')
 
-        elif event.type == pygame.MOUSEMOTION and mouse_pressed > 0:  # MOUSE MOTION WHILE PRESSED
-            update_mouse_move(pygame.mouse.get_pos())
+    print("Loading encoder...")
+    model = load_model(dir_name + 'model.h5')
+    enc = K.function([model.get_layer('encoder').input, K.learning_phase()],
+                     [model.layers[-1].output])
+    enc_model = Model(inputs=model.input, outputs=model.get_layer('pre_encoder').output)
 
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_r:  # KEYDOWN R
-                cur_params = np.clip(np.random.normal(0.0, 1.0, (num_params,)), -num_sigmas, num_sigmas)
-                needs_update = True
-                audio_reset = True
+    print("Loading statistics...")
+    means = np.load(dir_name + sub_dir_name + 'means.npy')
+    evals = np.load(dir_name + sub_dir_name + 'evals.npy')
+    evecs = np.load(dir_name + sub_dir_name + 'evecs.npy')
+    stds = np.load(dir_name + sub_dir_name + 'stds.npy')
 
-            if event.key == pygame.K_e:  # KEYDOWN E
-                cur_params = np.clip(np.random.normal(0.0, 2.0, (num_params,)), -num_sigmas, num_sigmas)
-                needs_update = True
-                audio_reset = True
+    print("Loading songs...")
+    y_samples = np.load('data/interim/samples.npy')
+    y_lengths = np.load('data/interim/lengths.npy')
 
-            if event.key == pygame.K_o:  # KEYDOWN O
-                print("RandIx: " + str(rand_ix))
-                if is_ae:
-                    example_song = y_samples[cur_len:cur_len + num_measures]
-                    cur_notes = example_song * 255
-                    x = enc_model.predict(np.expand_dims(example_song, 0), batch_size=1)[0]
-                    cur_len += y_lengths[rand_ix]
-                    rand_ix += 1
-                else:
-                    rand_ix = np.array([rand_ix], dtype=np.int64)
-                    x = enc_model.predict(rand_ix, batch_size=1)[0]
-                    rand_ix = (rand_ix + 1) % model.layers[0].input_dim
+    # Open a window
+    pygame.init()
+    pygame.font.init()
+    screen = pygame.display.set_mode((int(window_w), int(window_h)))
+    notes_surface = screen.subsurface((notes_x, notes_y, notes_w, notes_h))
+    pygame.display.set_caption('MusicEdit')
 
-                if use_pca:
-                    cur_params = np.dot(x - means, evecs.T) / evals
-                else:
-                    cur_params = (x - means) / stds
+    # Start the audio stream
+    audio_stream = audio.open(
+        format=audio.get_format_from_width(2),
+        channels=1,
+        rate=sample_rate,
+        output=True,
+        stream_callback=audio_callback)
+    audio_stream.start_stream()
 
-                needs_update = True
-                audio_reset = True
-
-            if event.key == pygame.K_g:  # KEYDOWN G
-                audio_pause = True
-                audio_reset = True
-                midi_utils.samples_to_midi(cur_notes, 'results/live.mid', 16, note_thresh)
-                save_audio = b''
-                while True:
-                    save_audio += audio_callback(None, 1024, None, None)[0]
-                    if audio_time == 0:
-                        break
-                wave_output = wave.open('results/live.wav', 'w')
-                wave_output.setparams((1, 2, sample_rate, 0, 'NONE', 'not compressed'))
-                wave_output.writeframes(save_audio)
-                wave_output.close()
-                audio_pause = False
-            if event.key == pygame.K_ESCAPE:  # KEYDOWN ESCAPE
+    # Main loop
+    running = True
+    rand_ix = 0
+    cur_len = 0
+    apply_controls()
+    while running:
+        # Process events
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:  # QUIT BUTTON HIT
                 running = False
                 break
 
-            if event.key == pygame.K_SPACE:  # KEYDOWN SPACE
-                audio_pause = not audio_pause
+            elif event.type == pygame.MOUSEBUTTONDOWN:  # MOUSE BUTTON DOWN
+                if pygame.mouse.get_pressed()[0]:
+                    prev_mouse_pos = pygame.mouse.get_pos()
+                    update_mouse_click(prev_mouse_pos)
+                    update_mouse_move(prev_mouse_pos)
+                elif pygame.mouse.get_pressed()[2]:
+                    cur_params = np.zeros((num_params,), dtype=np.float32)
+                    needs_update = True
 
-            if event.key == pygame.K_TAB:  # KEYDOWN TAB
-                audio_reset = True
+            elif event.type == pygame.MOUSEBUTTONUP:   # MOUSE BUTTON UP
+                mouse_pressed = 0
+                prev_mouse_pos = None
 
-            if event.key == pygame.K_1:  # KEYDOWN 1
-                instrument = 0
+            elif event.type == pygame.MOUSEMOTION and mouse_pressed > 0:  # MOUSE MOTION WHILE PRESSED
+                update_mouse_move(pygame.mouse.get_pos())
 
-            if event.key == pygame.K_2:  # KEYDOWN 2
-                instrument = 1
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:  # KEYDOWN R
+                    cur_params = np.clip(np.random.normal(0.0, 1.0, (num_params,)), -num_sigmas, num_sigmas)
+                    needs_update = True
+                    audio_reset = True
 
-            if event.key == pygame.K_3:  # KEYDOWN 3
-                instrument = 2
+                if event.key == pygame.K_e:  # KEYDOWN E
+                    cur_params = np.clip(np.random.normal(0.0, 2.0, (num_params,)), -num_sigmas, num_sigmas)
+                    needs_update = True
+                    audio_reset = True
 
-            if event.key == pygame.K_4:  # KEYDOWN 4
-                instrument = 3
+                if event.key == pygame.K_o:  # KEYDOWN O
+                    print("RandIx: " + str(rand_ix))
+                    if is_ae:
+                        example_song = y_samples[cur_len:cur_len + num_measures]
+                        cur_notes = example_song * 255
+                        x = enc_model.predict(np.expand_dims(example_song, 0), batch_size=1)[0]
+                        cur_len += y_lengths[rand_ix]
+                        rand_ix += 1
+                    else:
+                        rand_ix = np.array([rand_ix], dtype=np.int64)
+                        x = enc_model.predict(rand_ix, batch_size=1)[0]
+                        rand_ix = (rand_ix + 1) % model.layers[0].input_dim
 
-            if event.key == pygame.K_c:  # KEYDOWN C
-                y = np.expand_dims(np.where(cur_notes > note_thresh, 1, 0), 0)
-                x = enc_model.predict(y)[0]
-                if use_pca:
-                    cur_params = np.dot(x - means, evecs.T) / evals
-                else:
-                    cur_params = (x - means) / stds
-                needs_update = True
+                    if use_pca:
+                        cur_params = np.dot(x - means, evecs.T) / evals
+                    else:
+                        cur_params = (x - means) / stds
 
-    # Check if we need an update
-    if needs_update:
-        if use_pca:
-            x = means + np.dot(cur_params * evals, evecs)
-        else:
-            x = means + stds * cur_params
-        x = np.expand_dims(x, axis=0)
-        y = enc([x, 0])[0][0]
-        cur_notes = (y * 255.0).astype(np.uint8)
-        needs_update = False
+                    needs_update = True
+                    audio_reset = True
 
-    # Draw to the screen
-    screen.fill(background_color)
-    draw_notes()
-    draw_sliders()
-    draw_controls()
+                if event.key == pygame.K_g:  # KEYDOWN G
+                    audio_pause = True
+                    audio_reset = True
+                    midi_utils.samples_to_midi(cur_notes, 'results/live.mid', 16, note_thresh)
+                    save_audio = b''
+                    while True:
+                        save_audio += audio_callback(None, 1024, None, None)[0]
+                        if audio_time == 0:
+                            break
+                    wave_output = wave.open('results/live.wav', 'w')
+                    wave_output.setparams((1, 2, sample_rate, 0, 'NONE', 'not compressed'))
+                    wave_output.writeframes(save_audio)
+                    wave_output.close()
+                    audio_pause = False
+                if event.key == pygame.K_ESCAPE:  # KEYDOWN ESCAPE
+                    running = False
+                    break
 
-    # Flip the screen buffer
-    pygame.display.flip()
-    pygame.time.wait(10)
+                if event.key == pygame.K_SPACE:  # KEYDOWN SPACE
+                    audio_pause = not audio_pause
 
-# Close the audio stream
-audio_stream.stop_stream()
-audio_stream.close()
-audio.terminate()
+                if event.key == pygame.K_TAB:  # KEYDOWN TAB
+                    audio_reset = True
+
+                if event.key == pygame.K_1:  # KEYDOWN 1
+                    instrument = 0
+
+                if event.key == pygame.K_2:  # KEYDOWN 2
+                    instrument = 1
+
+                if event.key == pygame.K_3:  # KEYDOWN 3
+                    instrument = 2
+
+                if event.key == pygame.K_4:  # KEYDOWN 4
+                    instrument = 3
+
+                if event.key == pygame.K_c:  # KEYDOWN C
+                    y = np.expand_dims(np.where(cur_notes > note_thresh, 1, 0), 0)
+                    x = enc_model.predict(y)[0]
+                    if use_pca:
+                        cur_params = np.dot(x - means, evecs.T) / evals
+                    else:
+                        cur_params = (x - means) / stds
+                    needs_update = True
+
+        # Check if we need an update
+        if needs_update:
+            if use_pca:
+                x = means + np.dot(cur_params * evals, evecs)
+            else:
+                x = means + stds * cur_params
+            x = np.expand_dims(x, axis=0)
+            y = enc([x, 0])[0][0]
+            cur_notes = (y * 255.0).astype(np.uint8)
+            needs_update = False
+
+        # Draw to the screen
+        screen.fill(background_color)
+        draw_notes(screen, notes_surface)
+        draw_sliders(screen)
+        draw_controls(screen)
+
+        # Flip the screen buffer
+        pygame.display.flip()
+        pygame.time.wait(10)
+
+    # Close the audio stream
+    audio_stream.stop_stream()
+    audio_stream.close()
+    audio.terminate()
+
+
+if __name__ == "__main__":
+    # configure parser and parse arguments
+    parser = argparse.ArgumentParser(description='Play and edit music of a trained model.')
+    parser.add_argument('--model', default="e1/", type=str, help='The folder the model is stored in.')
+
+    args = parser.parse_args()
+    sub_dir_name = args.model
+    play()

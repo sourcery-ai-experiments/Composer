@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 import midi_utils
 import misc
 
+EPOCHS_TO_SAVE = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450]
 NUM_EPOCHS = 2000
 LR = 0.001
 CONTINUE_TRAIN = False
@@ -318,7 +319,7 @@ def train():
             plot_scores(train_loss, 'scores.png', True)
 
         i = iter + 1
-        if i in [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450] or (i % 100 == 0):
+        if i in EPOCHS_TO_SAVE or (i % 100 == 0):
             write_dir = ''
             if WRITE_HISTORY:
                 # Create folder to save models into
