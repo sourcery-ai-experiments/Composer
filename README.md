@@ -24,7 +24,7 @@ this works and other fun projects, please check out my
 YouTube channel 'CodeParade'.  Have fun making music!
 
 =========================================================
-
+```
 Controls:
  Right Click - Reset all sliders
          'R' - Random Song
@@ -38,3 +38,4 @@ Controls:
          '2' - Sawtooth wave instrument
          '3' - Triangle wave instrument
          '4' - Sine wave instrument
+```
