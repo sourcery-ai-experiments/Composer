@@ -337,7 +337,7 @@ def train():
 
         i = iter + 1
         if i in EPOCHS_TO_SAVE or (i % 100 == 0) or i == NUM_EPOCHS:
-            write_dir = 'results/'
+            write_dir = ''
             if WRITE_HISTORY:
                 # Create folder to save models into
                 write_dir += 'results/history/e' + str(i)
