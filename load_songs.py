@@ -9,6 +9,9 @@ def load_songs(data_folders):
 
     all_samples = []
     all_lengths = []
+    succ = 0
+    failed = 0
+    ignored = 0
     print("Loading Songs...")
     for folder in data_folders:
         for root, _, files in os.walk(folder):
@@ -21,13 +24,18 @@ def load_songs(data_folders):
                 except Exception as e:
                     print("ERROR ", path)
                     print(e)
+                    failed += 1
                     continue
-                if len(samples) < 8:
+                if len(samples) < 16:
+                    print('WARN', path, 'Sample too short, unused')
+                    ignored += 1
                     continue
 
                 samples, lens = misc.generate_add_centered_transpose(samples)
                 all_samples += samples
                 all_lengths += lens
+                print('SUCCESS', path, len(samples), 'samples')
+                succ += 1
 
     assert (sum(all_lengths) == len(all_samples))
     print("Saving " + str(len(all_samples)) + " samples...")
@@ -35,7 +43,7 @@ def load_songs(data_folders):
     all_lengths = np.array(all_lengths, dtype=np.uint32)
     np.save('data/interim/samples.npy', all_samples)
     np.save('data/interim/lengths.npy', all_lengths)
-    print("Done")
+    print('Done', succ, 'succeded', ignored, 'ignored', failed, 'failed of', succ + ignored + failed, 'in total')
 
 
 if __name__ == "__main__":

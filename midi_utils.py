@@ -7,36 +7,39 @@ samples_per_measure = 96
 
 def midi_to_samples(file_name):
     has_time_sig = False
-    flag_warning = False
     mid = MidiFile(file_name)
+
     ticks_per_beat = mid.ticks_per_beat
     ticks_per_measure = 4 * ticks_per_beat
 
-    for i, track in enumerate(mid.tracks):
+    for track in mid.tracks:
         for msg in track:
             if msg.type == 'time_signature':
                 new_tpm = msg.numerator * ticks_per_beat * 4 / msg.denominator
                 if has_time_sig and new_tpm != ticks_per_measure:
-                    flag_warning = True
+                    raise NotImplementedError('Multiple time signatures not supported')
                 ticks_per_measure = new_tpm
                 has_time_sig = True
-    if flag_warning:
-        print("  ^^^^^^ WARNING ^^^^^^")
-        print("    " + file_name)
-        print("    Detected multiple distinct time signatures.")
-        print("  ^^^^^^ WARNING ^^^^^^")
-        return []
 
     all_notes = {}
-    for i, track in enumerate(mid.tracks):
+    for track in mid.tracks:
         abs_time = 0
         for msg in track:
             abs_time += msg.time
+
+            # programs 0x70-0x7F are percussion and sound effects
+            # we ignore them
+            if msg.type == 'program_change' and msg.program >= 0x70:
+                break
+
             if msg.type == 'note_on':
                 if msg.velocity == 0:
                     continue
                 note = msg.note - (128 - num_notes) / 2
-                assert (0 <= note < num_notes)
+                if note < 0 or note >= num_notes:
+                    print('Ignoring', file_name, 'note is outside 0-%d range' % (num_notes - 1))
+                    return []
+
                 if note not in all_notes:
                     all_notes[note] = []
                 else:
@@ -57,18 +60,19 @@ def midi_to_samples(file_name):
 
     for note in all_notes:
         for start, end in all_notes[note]:
-            sample_ix = start / samples_per_measure  # find the sample/measure this belongs into
+            sample_ix = int(start / samples_per_measure)  # find the sample/measure this belongs into
+            assert (sample_ix < 1024 * 1024)
             while len(samples) <= sample_ix:
                 samples.append(np.zeros((samples_per_measure, num_notes), dtype=np.uint8))
-            sample = samples[int(sample_ix)]
-            start_ix = start - sample_ix * samples_per_measure
+            sample = samples[sample_ix]
+            start_ix = int(start - sample_ix * samples_per_measure)
             if False:
                 end_ix = min(end - sample_ix * samples_per_measure, samples_per_measure)
                 while start_ix < end_ix:
-                    sample[int(start_ix), int(note)] = 1
+                    sample[start_ix, note] = 1
                     start_ix += 1
             else:
-                sample[int(start_ix), int(note)] = 1
+                sample[start_ix, int(note)] = 1
     return samples
 
 

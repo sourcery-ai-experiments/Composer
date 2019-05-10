@@ -14,7 +14,7 @@ from keras import backend as K
 
 # User constants
 device = "cpu"
-dir_name = 'history/'
+dir_name = 'results/history/'
 sub_dir_name = 'e1/'
 sample_rate = 48000
 note_dt = 2000  # num samples
@@ -112,11 +112,11 @@ def audio_callback(in_data, frame_count, time_info, status):
     # Find and add any notes in this time window
     cur_dt = note_dt
     while note_time_dt < audio_time + frame_count:
-        measure_ix = note_time / note_h
+        measure_ix = int(note_time / note_h)
         if measure_ix >= num_measures:
             break
         note_ix = note_time % note_h
-        notes = np.where(cur_notes[int(measure_ix), note_ix] >= note_thresh)[0]
+        notes = np.where(cur_notes[measure_ix, note_ix] >= note_thresh)[0]
         for note in notes:
             freq = 2 * 38.89 * pow(2.0, note / 12.0) / sample_rate
             audio_notes.append((note_time_dt, freq))
@@ -388,6 +388,7 @@ def play():
                     wave_output.writeframes(save_audio)
                     wave_output.close()
                     audio_pause = False
+
                 if event.key == pygame.K_ESCAPE:  # KEYDOWN ESCAPE
                     running = False
                     break

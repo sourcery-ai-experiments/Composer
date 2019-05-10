@@ -64,7 +64,7 @@ def plot_scores(scores, f_name, on_top=True):
 
 
 def save_config(num_songs, model):
-    with open('config.txt', 'w') as fout:
+    with open('results/config.txt', 'w') as fout:
         fout.write('LR:          ' + str(LR) + '\n')
         fout.write('BN_M:        ' + str(BN_M) + '\n')
         fout.write('BATCH_SIZE:  ' + str(BATCH_SIZE) + '\n')
@@ -98,7 +98,15 @@ def make_rand_songs(func, write_dir, rand_vecs):
         midi_utils.samples_to_midi(y_song[0], write_dir + 'rand' + str(i) + '.mid', 16, 0.25)
 
 
-def make_rand_songs_normalized(enc, x_orig, y_orig, func, write_dir, rand_vecs):
+def make_msee(enc, x_orig, y_orig, write_dir):
+    """
+    means, stddevs, evals, evecs
+    :param enc:
+    :param x_orig:
+    :param y_orig:
+    :param write_dir:
+    :return:
+    """
     if USE_EMBEDDING:
         x_enc = np.squeeze(enc.predict(x_orig))
     else:
@@ -117,6 +125,11 @@ def make_rand_songs_normalized(enc, x_orig, y_orig, func, write_dir, rand_vecs):
     np.save(write_dir + 'stds.npy', x_stds)
     np.save(write_dir + 'evals.npy', e)
     np.save(write_dir + 'evecs.npy', v)
+    return x_mean, x_stds, e, v
+
+
+def make_rand_songs_normalized(enc, x_orig, y_orig, func, write_dir, rand_vecs):
+    x_mean, x_stds, e, v = make_msee(enc, x_orig, y_orig, write_dir)
 
     x_vecs = x_mean + np.dot(rand_vecs * e, v)
     make_rand_songs(func, write_dir, x_vecs)
@@ -146,15 +159,19 @@ def make_rand_songs_normalized(enc, x_orig, y_orig, func, write_dir, rand_vecs):
 
 
 def train():
-    if WRITE_HISTORY:
+    if not os.path.exists('results'):
+        os.makedirs('results')
+    if WRITE_HISTORY and not os.path.exists('results/history'):
         # Create folder to save models into
-        if not os.path.exists('history'):
-            os.makedirs('history')
+        os.makedirs('history')
 
     ###################################
     #  Load Dataset
     ###################################
     print("Loading Data...")
+    if not os.path.exists('data/interim/samples.npy') or not os.path.exists('data/interim/lengths.npy'):
+        print('No input data found, run load_songs.py first')
+        exit(1)
     y_samples = np.load('data/interim/samples.npy')
     y_lengths = np.load('data/interim/lengths.npy')
     num_samples = y_samples.shape[0]
@@ -191,7 +208,7 @@ def train():
     ###################################
     if CONTINUE_TRAIN or PLAY_ONLY:
         print("Loading model...")
-        model = load_model('model.h5')  # , custom_objects=custom_objects)
+        model = load_model('results/model.h5')
     else:
         print("Building model...")
 
@@ -285,7 +302,7 @@ def train():
         for i in range(20):
             x_test_song = x_train[i:i + 1]
             y_song = model.predict(x_test_song, batch_size=BATCH_SIZE)[0]
-            midi_utils.samples_to_midi(y_song, 'gt' + str(i) + '.mid', 16)
+            midi_utils.samples_to_midi(y_song, 'results/gt' + str(i) + '.mid', 16)
         exit(0)
 
     print("Training...")
@@ -314,22 +331,28 @@ def train():
         print("Train loss: " + str(train_loss[-1]))
 
         if WRITE_HISTORY:
-            plot_scores(train_loss, 'history/scores.png', True)
+            plot_scores(train_loss, 'results/history/scores.png', True)
         else:
-            plot_scores(train_loss, 'scores.png', True)
+            plot_scores(train_loss, 'results/scores.png', True)
 
         i = iter + 1
-        if i in EPOCHS_TO_SAVE or (i % 100 == 0):
-            write_dir = ''
+        if i in EPOCHS_TO_SAVE or (i % 100 == 0) or i == NUM_EPOCHS:
+            write_dir = 'results/'
             if WRITE_HISTORY:
                 # Create folder to save models into
-                write_dir += 'history/e' + str(i)
+                write_dir += 'results/history/e' + str(i)
                 if not os.path.exists(write_dir):
                     os.makedirs(write_dir)
                 write_dir += '/'
-                model.save('history/model.h5')
+                model.save('results/history/model.h5')
             else:
-                model.save('model.h5')
+                model.save('results/model.h5')
+
+            # Save output on last epoch
+            if i == NUM_EPOCHS:
+                model.save('results/model.h5')
+                make_msee(enc, x_orig, y_orig, 'results/')
+
             print("Saved")
 
             if USE_EMBEDDING:
