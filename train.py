@@ -268,6 +268,7 @@ def train():
     offset = 0
 
     for epoch in range(NUM_EPOCHS):
+        print("Training epoch: ", epoch, "of", NUM_EPOCHS)
         if USE_EMBEDDING:
             history = model.fit(x_train, y_train, batch_size=BATCH_SIZE, epochs=1)
         else:
