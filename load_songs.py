@@ -33,7 +33,7 @@ def load_songs(data_folders):
     for folder in data_folders:
         for root, _, files in os.walk(folder):
             for file in files:
-                path = root + "\\" + file
+                path = os.path.join(root, file)
                 if not (path.endswith('.mid') or path.endswith('.midi')):
                     continue
 
