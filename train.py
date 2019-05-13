@@ -170,7 +170,7 @@ def train():
     if not os.path.exists('results'):
         os.makedirs('results')
     if WRITE_HISTORY and not os.path.exists('results/history'):
-        os.makedirs('history')
+        os.makedirs('results/history')
 
     # Load dataset into memory
     print("Loading Data...")
