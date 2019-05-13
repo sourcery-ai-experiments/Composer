@@ -3,6 +3,10 @@ Generates video game music using neural networks.
 
 https://youtu.be/UWxfnNXlVy8
 
+## How to install
+
+* Install dependencies in python3 by running `pip install -r requirements.txt`.
+
 ## How to run
 
 * Find some dataset to train on. More info on where to find datasets are in data/raw/README.md.
@@ -10,13 +14,13 @@ https://youtu.be/UWxfnNXlVy8
   You can point the script to a location using the --data_folder flag one or multiple times.
 * Run train.py. This will train your network and store the progress from time to time (EPOCHS_TO_SAVE to change storing frequency).
   Only stops if you interrupt it or after 2000 epochs.
-* Run live_edit.py --model "e1/" where "e1/" indicates the folder the stored model is in.
+* Run composer.py --model "e1/" where "e1/" indicates the folder the stored model is in.
 
-## Live edit
+## Composer
 
-The live edit mode will load your trained model with is
+The Composer script will load your trained model with is
 music generator trained on the midi files you provided.
-Internally, it tries to compress a song into only 120 numbers.
+Internally, the model tries to compress a song into only 120 numbers.
 The sliders adjust those numbers and are ordered from most
 important (left) to least important (right).  Just the
 top 40 are shown on screen.  For more details about how
