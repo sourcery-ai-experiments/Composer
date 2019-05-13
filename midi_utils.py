@@ -133,6 +133,14 @@ def samples_to_midi(samples, file_name, threshold=0.5):
     ticks_per_measure = 4 * ticks_per_beat
     ticks_per_sample = ticks_per_measure / samples_per_measure
 
+    # add instrument for track
+    # https://en.wikipedia.org/wiki/General_MIDI#Program_change_events
+    piano = 1
+    honky_tonk_piano = 4
+    xylophone = 14
+    program_message = Message('program_change', program=piano, time=0, channel=0)
+    track.append(program_message)
+
     abs_time = 0
     last_time = 0
     for sample in samples:
