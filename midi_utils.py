@@ -8,15 +8,14 @@ Utils to read and write midi.
 from mido import MidiFile, MidiTrack, Message
 import numpy as np
 
-num_notes = 96
-samples_per_measure = 96
 
-
-def midi_to_samples(file_name, encode_length=False):
+def midi_to_samples(file_name, encode_length=False, num_notes=96, samples_per_measure=96):
     """
     Turn a midi file into a sample.
     :param file_name:
     :param encode_length:
+    :param num_notes:
+    :param samples_per_measure:
     :return:
     """
     has_time_sig = False
@@ -115,12 +114,14 @@ def midi_to_samples(file_name, encode_length=False):
     return samples
 
 
-def samples_to_midi(samples, file_name, threshold=0.5):
+def samples_to_midi(samples, file_name, threshold=0.5, num_notes=96, samples_per_measure=96):
     """
     Turn the samples/measures back into midi.
     :param samples:
     :param file_name:
     :param threshold:
+    :param num_notes:
+    :param samples_per_measure:
     :return:
     """
     # TODO: Encode the certainties of the notes into the volume of the midi for the notes that are above threshold

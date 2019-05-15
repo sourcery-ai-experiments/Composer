@@ -33,6 +33,7 @@ note_threshold = 32
 use_pca = True
 is_ae = True
 
+# colors
 background_color = (210, 210, 210)
 edge_color = (60, 60, 60)
 slider_colors = [(90, 20, 20), (90, 90, 20), (20, 90, 20), (20, 90, 90), (20, 20, 90), (90, 20, 90)]
@@ -341,11 +342,11 @@ def play():
     decoder = K.function([model.get_layer('decoder').input, K.learning_phase()],
                          [model.layers[-1].output])
 
-    print("Loading statistics...")
-    means = np.load(dir_name + sub_dir_name + 'means.npy')
-    evals = np.load(dir_name + sub_dir_name + 'evals.npy')
-    evecs = np.load(dir_name + sub_dir_name + 'evecs.npy')
-    stds = np.load(dir_name + sub_dir_name + 'stds.npy')
+    print("Loading gaussian/pca statistics...")
+    latent_means = np.load(dir_name + sub_dir_name + 'latent_means.npy')
+    latent_stds = np.load(dir_name + sub_dir_name + 'latent_stds.npy')
+    latent_pca_values = np.load(dir_name + sub_dir_name + 'latent_pca_values.npy')
+    latent_pca_vectors = np.load(dir_name + sub_dir_name + 'latent_pca_vectors.npy')
 
     print("Loading songs...")
     y_samples = np.load('data/interim/samples.npy')
@@ -369,7 +370,7 @@ def play():
 
     # main loop
     running = True
-    rand_ix = 0
+    random_song_ix = 0
     cur_len = 0
     apply_controls()
     while running:
@@ -409,22 +410,23 @@ def play():
                     audio_reset = True
 
                 if event.key == pygame.K_o:  # KEYDOWN O
-                    print("Random Index: " + str(rand_ix))
+                    # check how well the autoencoder can reconstruct a random song
+                    print("Random Song Index: " + str(random_song_ix))
                     if is_ae:
                         example_song = y_samples[cur_len:cur_len + num_measures]
                         current_notes = example_song * 255
-                        x = encoder.predict(np.expand_dims(example_song, 0), batch_size=1)[0]
-                        cur_len += y_lengths[rand_ix]
-                        rand_ix += 1
+                        latent_x = encoder.predict(np.expand_dims(example_song, 0), batch_size=1)[0]
+                        cur_len += y_lengths[random_song_ix]
+                        random_song_ix += 1
                     else:
-                        rand_ix = np.array([rand_ix], dtype=np.int64)
-                        x = encoder.predict(rand_ix, batch_size=1)[0]
-                        rand_ix = (rand_ix + 1) % model.layers[0].input_dim
+                        random_song_ix = np.array([random_song_ix], dtype=np.int64)
+                        latent_x = encoder.predict(random_song_ix, batch_size=1)[0]
+                        random_song_ix = (random_song_ix + 1) % model.layers[0].input_dim
 
                     if use_pca:
-                        current_params = np.dot(x - means, evecs.T) / evals
+                        current_params = np.dot(latent_x - latent_means, latent_pca_vectors.T) / latent_pca_values
                     else:
-                        current_params = (x - means) / stds
+                        current_params = (latent_x - latent_means) / latent_stds
 
                     needs_update = True
                     audio_reset = True
@@ -483,21 +485,21 @@ def play():
                 if event.key == pygame.K_c:  # KEYDOWN C
                     #
                     y = np.expand_dims(np.where(current_notes > note_threshold, 1, 0), 0)
-                    x = encoder.predict(y)[0]
+                    latent_x = encoder.predict(y)[0]
                     if use_pca:
-                        current_params = np.dot(x - means, evecs.T) / evals
+                        current_params = np.dot(latent_x - latent_means, latent_pca_vectors.T) / latent_pca_values
                     else:
-                        current_params = (x - means) / stds
+                        current_params = (latent_x - latent_means) / latent_stds
                     needs_update = True
 
         # check if params were changed so that a new song should be generated
         if needs_update:
             if use_pca:
-                x = means + np.dot(current_params * evals, evecs)
+                latent_x = latent_means + np.dot(current_params * latent_pca_values, latent_pca_vectors)
             else:
-                x = means + stds * current_params
-            x = np.expand_dims(x, axis=0)
-            y = decoder([x, 0])[0][0]
+                latent_x = latent_means + latent_stds * current_params
+            latent_x = np.expand_dims(latent_x, axis=0)
+            y = decoder([latent_x, 0])[0][0]
             current_notes = (y * 255.0).astype(np.uint8)
             needs_update = False
 
@@ -520,7 +522,7 @@ def play():
 if __name__ == "__main__":
     # configure parser and parse arguments
     parser = argparse.ArgumentParser(description='Neural Composer: Play and edit music of a trained model.')
-    parser.add_argument('--model', default="e1/", type=str, help='The folder the model is stored in.')
+    parser.add_argument('--model', default=sub_dir_name, type=str, help='The folder the model is stored in.')
 
     args = parser.parse_args()
     sub_dir_name = args.model

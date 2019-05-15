@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Train a autoencoder model to learn to encode songs.
+Train an autoencoder model to learn to encode songs.
 """
 
 import random
@@ -11,8 +11,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 import midi_utils
-import misc
+import plot_utils
 import models
+
+import argparse
 
 #  Load Keras
 print("Loading keras...")
@@ -27,8 +29,8 @@ from keras import backend as K
 from keras.losses import binary_crossentropy
 from keras.optimizers import Adam, RMSprop
 
+EPOCHS_QTY = 2000
 EPOCHS_TO_SAVE = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450]
-NUM_EPOCHS = 2000
 LEARNING_RATE = 0.001  # learning rate
 CONTINUE_TRAIN = False
 GENERATE_ONLY = False
@@ -38,7 +40,7 @@ NUM_RAND_SONGS = 10
 
 # network params
 DROPOUT_RATE = 0.1
-BATCHNORM_MOMENTUM = 0.9
+BATCHNORM_MOMENTUM = 0.9  # weighted normalization with the past
 USE_EMBEDDING = False
 USE_VAE = False
 VAE_B1 = 0.02
@@ -55,13 +57,29 @@ K.set_image_data_format('channels_first')
 np.random.seed(0)
 random.seed(0)
 
+
 def vae_loss(x, x_decoded_mean, z_log_sigma_sq, z_mean):
+    """
+    Variational autoencoder loss function.
+    :param x:
+    :param x_decoded_mean:
+    :param z_log_sigma_sq:
+    :param z_mean:
+    :return:
+    """
     xent_loss = binary_crossentropy(x, x_decoded_mean)
     kl_loss = VAE_B2 * K.mean(1 + z_log_sigma_sq - K.square(z_mean) - K.exp(z_log_sigma_sq), axis=None)
     return xent_loss - kl_loss
 
 
-def plot_scores(scores, f_name, on_top=True):
+def plot_losses(scores, f_name, on_top=True):
+    """
+    Plot loss.
+    :param scores:
+    :param f_name:
+    :param on_top:
+    :return:
+    """
     plt.clf()
     ax = plt.gca()
     ax.yaxis.tick_right()
@@ -75,9 +93,15 @@ def plot_scores(scores, f_name, on_top=True):
     plt.savefig(f_name)
 
 
-def save_config(num_songs, model):
+def save_training_config(num_songs, model):
+    """
+    Save configuration of training.
+    :param num_songs:
+    :param model:
+    :return:
+    """
     with open('results/config.txt', 'w') as file_out:
-        file_out.write('LEARNING_RATE:       ' + str(LEARNING_RATE) + '\n')
+        file_out.write('LEARNING_RATE:       ' + str(learning_rate) + '\n')
         file_out.write('BATCHNORM_MOMENTUM:  ' + str(BATCHNORM_MOMENTUM) + '\n')
         file_out.write('BATCH_SIZE:          ' + str(BATCH_SIZE) + '\n')
         file_out.write('NUM_OFFSETS:         ' + str(NUM_OFFSETS) + '\n')
@@ -86,81 +110,92 @@ def save_config(num_songs, model):
         file_out.write('optimizer:           ' + type(model.optimizer).__name__ + '\n')
 
 
-def generate_random_songs(func, write_dir, rand_vectors):
+def generate_random_songs(decoder, write_dir, random_vectors):
     """
     Generate random songs using random latent vectors.
-    :param func:
+    :param decoder:
     :param write_dir:
-    :param rand_vectors:
+    :param random_vectors:
     :return:
     """
-    for i in range(rand_vectors.shape[0]):
-        x_rand = rand_vectors[i:i + 1]
-        y_song = func([x_rand, 0])[0]
-        midi_utils.samples_to_midi(y_song[0], write_dir + 'rand' + str(i) + '.mid', 0.25)
+    for i in range(random_vectors.shape[0]):
+        random_latent_x = random_vectors[i:i + 1]
+        y_song = decoder([random_latent_x, 0])[0]
+        midi_utils.samples_to_midi(y_song[0], write_dir + 'random_vectors' + str(i) + '.mid', 32)
 
 
-def make_msee(enc, x_orig, y_orig, write_dir):
+def calculate_and_store_pca_statistics(encoder, x_orig, y_orig, write_dir):
     """
-    means, stddevs, evals, evecs
-    :param enc:
+    Calculate means, stddevs, covariance singular values (pca values), covariance singular vectors (pca vectors)
+    to more efficiently navigate/find configurations in the latent space.
+    :param encoder:
     :param x_orig:
     :param y_orig:
     :param write_dir:
     :return:
     """
     if USE_EMBEDDING:
-        x_enc = np.squeeze(enc.predict(x_orig))
+        latent_x = np.squeeze(encoder.predict(x_orig))
     else:
-        x_enc = np.squeeze(enc.predict(y_orig))
+        latent_x = np.squeeze(encoder.predict(y_orig))
 
-    x_mean = np.mean(x_enc, axis=0)
-    x_stds = np.std(x_enc, axis=0)
-    x_cov = np.cov((x_enc - x_mean).T)
-    u, s, v = np.linalg.svd(x_cov)
-    e = np.sqrt(s)
+    latent_mean = np.mean(latent_x, axis=0)
+    latent_stds = np.std(latent_x, axis=0)
+    latent_cov = np.cov((latent_x - latent_mean).T)
+    _, latent_pca_values, latent_pca_vectors = np.linalg.svd(latent_cov)
+    latent_pca_values = np.sqrt(latent_pca_values)
 
-    print("Means: ", x_mean[:6])
-    print("Evals: ", e[:6])
+    print("Latent Mean values: ", latent_mean[:6])
+    print("Latent PCA values: ", latent_pca_values[:6])
 
-    np.save(write_dir + 'means.npy', x_mean)
-    np.save(write_dir + 'stds.npy', x_stds)
-    np.save(write_dir + 'evals.npy', e)
-    np.save(write_dir + 'evecs.npy', v)
-    return x_mean, x_stds, e, v
+    np.save(write_dir + 'latent_means.npy', latent_mean)
+    np.save(write_dir + 'latent_stds.npy', latent_stds)
+    np.save(write_dir + 'latent_pca_values.npy', latent_pca_values)
+    np.save(write_dir + 'latent_pca_vectors.npy', latent_pca_vectors)
+    return latent_mean, latent_stds, latent_pca_values, latent_pca_vectors
 
 
-def generate_random_songs_normalized(encoder, x_orig, y_orig, decoder, write_dir, random_vectors):
-    x_mean, x_stds, e, v = make_msee(encoder, x_orig, y_orig, write_dir)
+def generate_normalized_random_songs(x_orig, y_orig, encoder, decoder, random_vectors, write_dir):
+    """
+    Generate a number of random songs from some normal latent vector samples.
+    :param encoder:
+    :param x_orig:
+    :param y_orig:
+    :param decoder:
+    :param write_dir:
+    :param random_vectors:
+    :return:
+    """
+    latent_mean, latent_stds, pca_values, pca_vectors = calculate_and_store_pca_statistics(encoder, x_orig, y_orig, write_dir)
 
-    x_vectors = x_mean + np.dot(random_vectors * e, v)
-    generate_random_songs(decoder, write_dir, x_vectors)
+    latent_vectors = latent_mean + np.dot(random_vectors * pca_values, pca_vectors)
+    generate_random_songs(decoder, write_dir, latent_vectors)
 
     title = ''
     if '/' in write_dir:
         title = 'Epoch: ' + write_dir.split('/')[-2][1:]
 
     plt.clf()
-    e[::-1].sort()
+    pca_values[::-1].sort()
     plt.title(title)
-    plt.bar(np.arange(e.shape[0]), e, align='center')
+    plt.bar(np.arange(pca_values.shape[0]), pca_values, align='center')
     plt.draw()
-    plt.savefig(write_dir + 'evals.png')
+    plt.savefig(write_dir + 'latent_pca_values.png')
 
     plt.clf()
     plt.title(title)
-    plt.bar(np.arange(e.shape[0]), x_mean, align='center')
+    plt.bar(np.arange(pca_values.shape[0]), latent_mean, align='center')
     plt.draw()
-    plt.savefig(write_dir + 'means.png')
+    plt.savefig(write_dir + 'latent_means.png')
 
     plt.clf()
     plt.title(title)
-    plt.bar(np.arange(e.shape[0]), x_stds, align='center')
+    plt.bar(np.arange(pca_values.shape[0]), latent_stds, align='center')
     plt.draw()
-    plt.savefig(write_dir + 'stds.png')
+    plt.savefig(write_dir + 'latent_stds.png')
 
 
-def train():
+def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/lengths.npy', epochs_qty=EPOCHS_QTY, learning_rate=LEARNING_RATE):
     """
     Train model.
     :return:
@@ -174,12 +209,12 @@ def train():
 
     # Load dataset into memory
     print("Loading Data...")
-    if not os.path.exists('data/interim/samples.npy') or not os.path.exists('data/interim/lengths.npy'):
-        print('No input data found, run load_songs.py first.')
+    if not os.path.exists(samples_path) or not os.path.exists(lengths_path):
+        print('No input data found, run preprocess_songs.py first.')
         exit(1)
 
-    y_samples = np.load('data/interim/samples.npy')
-    y_lengths = np.load('data/interim/lengths.npy')
+    y_samples = np.load(samples_path)
+    y_lengths = np.load(lengths_path)
 
     samples_qty = y_samples.shape[0]
     songs_qty = y_lengths.shape[0]
@@ -222,21 +257,21 @@ def train():
     else:
         print("Building model...")
 
-        model = models.create_model(input_shape=y_shape[1:],
-                                    latent_space_size=LATENT_SPACE_SIZE,
-                                    dropout_rate=DROPOUT_RATE,
-                                    max_windows=MAX_WINDOWS,
-                                    batchnorm_momentum=BATCHNORM_MOMENTUM,
-                                    use_vae=USE_VAE,
-                                    vae_b1=VAE_B1,
-                                    use_embedding=USE_EMBEDDING,
-                                    embedding_input_shape=x_shape[1:],
-                                    embedding_shape=x_train.shape[0])
+        model = models.create_autoencoder_model(input_shape=y_shape[1:],
+                                                latent_space_size=LATENT_SPACE_SIZE,
+                                                dropout_rate=DROPOUT_RATE,
+                                                max_windows=MAX_WINDOWS,
+                                                batchnorm_momentum=BATCHNORM_MOMENTUM,
+                                                use_vae=USE_VAE,
+                                                vae_b1=VAE_B1,
+                                                use_embedding=USE_EMBEDDING,
+                                                embedding_input_shape=x_shape[1:],
+                                                embedding_shape=x_train.shape[0])
 
         if USE_VAE:
-            model.compile(optimizer=Adam(lr=LEARNING_RATE), loss=vae_loss)
+            model.compile(optimizer=Adam(lr=learning_rate), loss=vae_loss)
         else:
-            model.compile(optimizer=RMSprop(lr=LEARNING_RATE), loss='binary_crossentropy')
+            model.compile(optimizer=RMSprop(lr=learning_rate), loss='binary_crossentropy')
 
         # plot model with graphvis if installed
         try:
@@ -246,37 +281,37 @@ def train():
 
     #  train
     print("Referencing sub-models...")
-    decoder = K.function([model.get_layer('decoder').input, K.learning_phase()],
-                         [model.layers[-1].output])
+    decoder = K.function([model.get_layer('decoder').input, K.learning_phase()], [model.layers[-1].output])
     encoder = Model(inputs=model.input, outputs=model.get_layer('encoder').output)
 
     random_vectors = np.random.normal(0.0, 1.0, (NUM_RAND_SONGS, LATENT_SPACE_SIZE))
-    np.save('data/interim/rand.npy', random_vectors)
+    np.save('data/interim/random_vectors.npy', random_vectors)
 
     if GENERATE_ONLY:
         print("Generating songs...")
-        generate_random_songs_normalized(encoder, x_orig, y_orig, decoder, 'results/', random_vectors)
+        generate_normalized_random_songs(x_orig, y_orig, encoder, decoder, random_vectors, 'results/')
         for save_epoch in range(20):
             x_test_song = x_train[save_epoch:save_epoch + 1]
             y_song = model.predict(x_test_song, batch_size=BATCH_SIZE)[0]
             midi_utils.samples_to_midi(y_song, 'results/gt' + str(save_epoch) + '.mid')
         exit(0)
 
+    save_training_config(songs_qty, model)
     print("Training model...")
-    save_config(songs_qty, model)
     train_loss = []
     offset = 0
 
-    for epoch in range(NUM_EPOCHS):
-        print("Training epoch: ", epoch, "of", NUM_EPOCHS)
+    for epoch in range(epochs_qty):
+        print("Training epoch: ", epoch, "of", epochs_qty)
         if USE_EMBEDDING:
             history = model.fit(x_train, y_train, batch_size=BATCH_SIZE, epochs=1)
         else:
+            # produce songs from its samples with a different starting point of the song each time
             song_start_ix = 0
             for song_ix in range(songs_qty):
                 song_end_ix = song_start_ix + y_lengths[song_ix]
                 for window_ix in range(MAX_WINDOWS):
-                    song_measure_ix = (window_ix + offset) % (song_end_ix - song_start_ix)
+                    song_measure_ix = (window_ix + offset) % y_lengths[song_ix]
                     y_train[song_ix, window_ix] = y_samples[song_start_ix + song_measure_ix]
                 song_start_ix = song_end_ix
             assert (song_end_ix == samples_qty)
@@ -290,12 +325,13 @@ def train():
         print("Train loss: " + str(train_loss[-1]))
 
         if WRITE_HISTORY:
-            plot_scores(train_loss, 'results/history/scores.png', True)
+            plot_losses(train_loss, 'results/history/losses.png', True)
         else:
-            plot_scores(train_loss, 'results/scores.png', True)
+            plot_losses(train_loss, 'results/losses.png', True)
 
+        # save model periodically
         save_epoch = epoch + 1
-        if save_epoch in EPOCHS_TO_SAVE or (save_epoch % 100 == 0) or save_epoch == NUM_EPOCHS:
+        if save_epoch in EPOCHS_TO_SAVE or (save_epoch % 100 == 0) or save_epoch == epochs_qty:
             write_dir = ''
             if WRITE_HISTORY:
                 # Create folder to save models into
@@ -307,11 +343,6 @@ def train():
             else:
                 model.save('results/model.h5')
 
-            # Save output on last epoch
-            if save_epoch == NUM_EPOCHS:
-                model.save('results/model.h5')
-                make_msee(encoder, x_orig, y_orig, 'results/')
-
             print("...Saved.")
 
             if USE_EMBEDDING:
@@ -319,13 +350,25 @@ def train():
             else:
                 y_song = model.predict(y_test_song, batch_size=BATCH_SIZE)[0]
 
-            misc.plot_samples(write_dir + 'test', y_song)
+            plot_utils.plot_samples(write_dir + 'test', y_song)
             midi_utils.samples_to_midi(y_song, write_dir + 'test.mid')
 
-            generate_random_songs_normalized(encoder, x_orig, y_orig, decoder, write_dir, random_vectors)
+            generate_normalized_random_songs(x_orig, y_orig, encoder, decoder, random_vectors, write_dir)
 
     print("...Done.")
 
 
 if __name__ == "__main__":
-    train()
+    # configure parser and parse arguments
+    parser = argparse.ArgumentParser(description='Train to reconstruct midi in autoencoder.')
+    parser.add_argument('--samples_path', default='data/interim/samples.npy', type=str, help='Path to samples numpy array.')
+    parser.add_argument('--lengths_path', default='data/interim/lengths.npy', type=str, help='Path to sample lengths numpy array.')
+    parser.add_argument('--epochs_qty', default=EPOCHS_QTY, type=int, help='The number of epochs to be trained.')
+    parser.add_argument('--learning_rate', default=LEARNING_RATE, type=float, help='The learning rate to train the model.')
+
+    args = parser.parse_args()
+    epochs_qty = args.epochs_qty
+    learning_rate = args.learning_rate
+    samples_path = args.samples_path
+    lengths_path = args.lengths_path
+    train(samples_path, lengths_path, epochs_qty, learning_rate)

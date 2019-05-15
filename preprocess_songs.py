@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Load songs from midi and save them in numpy format.
+Load songs from midi, preprocess and save them in numpy format.
 """
 
 import midi_utils
@@ -12,9 +12,9 @@ import numpy as np
 import argparse
 
 
-def load_songs(data_folders):
+def preprocess_songs(data_folders):
     """
-    Load the songs from the data folders and turn them into a dataset of samples/pitches and lengths of the tones.
+    Load and preprocess the songs from the data folders and turn them into a dataset of samples/pitches and lengths of the tones.
     :param data_folders:
     :return:
     """
@@ -52,7 +52,7 @@ def load_songs(data_folders):
                     ignored += 1
                     continue
 
-                # transpose samples (center them in full range)
+                # transpose samples (center them in full range to get more training samples for the same tones)
                 samples, lengths = music_utils.generate_centered_transpose(samples)
                 all_samples += samples
                 all_lengths += lengths
@@ -72,8 +72,8 @@ def load_songs(data_folders):
 
 if __name__ == "__main__":
     # configure parser and parse arguments
-    parser = argparse.ArgumentParser(description='Load songs and put them into a dataset.')
+    parser = argparse.ArgumentParser(description='Load songs, preprocess them and put them into a dataset.')
     parser.add_argument('--data_folder', default=["data/raw"], type=str, help='The path to the midi data', action='append')
 
     args = parser.parse_args()
-    load_songs(args.data_folder)
+    preprocess_songs(args.data_folder)

@@ -18,8 +18,21 @@ def vae_sampling(args):
     return z_mean + K.exp(z_log_sigma_sq * 0.5) * epsilon
 
 
-def create_model(input_shape, latent_space_size, dropout_rate, max_windows, batchnorm_momentum, use_vae=False, vae_b1=0.02, use_embedding=False, embedding_input_shape=None, embedding_shape=None):
-
+def create_autoencoder_model(input_shape, latent_space_size, dropout_rate, max_windows, batchnorm_momentum, use_vae=False, vae_b1=0.02, use_embedding=False, embedding_input_shape=None, embedding_shape=None):
+    """
+    Create larger autoencoder with the options of making it variational and embedding.
+    :param input_shape:
+    :param latent_space_size:
+    :param dropout_rate:
+    :param max_windows:
+    :param batchnorm_momentum:
+    :param use_vae:
+    :param vae_b1:
+    :param use_embedding:
+    :param embedding_input_shape:
+    :param embedding_shape:
+    :return:
+    """
     if use_embedding:
         x_in = Input(shape=embedding_input_shape)
         print((None,) + embedding_input_shape)
