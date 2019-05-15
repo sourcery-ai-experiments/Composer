@@ -93,7 +93,7 @@ def plot_losses(scores, f_name, on_top=True):
     plt.savefig(f_name)
 
 
-def save_training_config(num_songs, model):
+def save_training_config(num_songs, model, learning_rate):
     """
     Save configuration of training.
     :param num_songs:
@@ -296,7 +296,7 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
             midi_utils.samples_to_midi(y_song, 'results/gt' + str(save_epoch) + '.mid')
         exit(0)
 
-    save_training_config(songs_qty, model)
+    save_training_config(songs_qty, model, learning_rate)
     print("Training model...")
     train_loss = []
     offset = 0
