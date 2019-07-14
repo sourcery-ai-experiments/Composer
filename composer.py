@@ -85,6 +85,7 @@ needs_update = True
 current_params = np.zeros((num_params,), dtype=np.float32)
 current_notes = np.zeros((num_measures, note_h, note_w), dtype=np.uint8)
 cur_controls = np.array(control_inits, dtype=np.float32)
+songs_loaded = False
 
 # setup audio stream
 audio = pyaudio.PyAudio()
@@ -331,6 +332,7 @@ def play():
     global prev_mouse_pos
     global audio_reset
     global instrument
+    global songs_loaded
 
     print("Keras version: " + keras.__version__)
 
@@ -343,14 +345,10 @@ def play():
                          [model.layers[-1].output])
 
     print("Loading gaussian/pca statistics...")
-    latent_means = np.load(dir_name + sub_dir_name + 'latent_means.npy')
-    latent_stds = np.load(dir_name + sub_dir_name + 'latent_stds.npy')
-    latent_pca_values = np.load(dir_name + sub_dir_name + 'latent_pca_values.npy')
-    latent_pca_vectors = np.load(dir_name + sub_dir_name + 'latent_pca_vectors.npy')
-
-    print("Loading songs...")
-    y_samples = np.load('data/interim/samples.npy')
-    y_lengths = np.load('data/interim/lengths.npy')
+    latent_means = np.load(dir_name + sub_dir_name + '/latent_means.npy')
+    latent_stds = np.load(dir_name + sub_dir_name + '/latent_stds.npy')
+    latent_pca_values = np.load(dir_name + sub_dir_name + '/latent_pca_values.npy')
+    latent_pca_vectors = np.load(dir_name + sub_dir_name + '/latent_pca_vectors.npy')
 
     # open a window
     pygame.init()
@@ -410,26 +408,41 @@ def play():
                     audio_reset = True
 
                 if event.key == pygame.K_o:  # KEYDOWN O
-                    # check how well the autoencoder can reconstruct a random song
-                    print("Random Song Index: " + str(random_song_ix))
-                    if is_ae:
-                        example_song = y_samples[cur_len:cur_len + num_measures]
-                        current_notes = example_song * 255
-                        latent_x = encoder.predict(np.expand_dims(example_song, 0), batch_size=1)[0]
-                        cur_len += y_lengths[random_song_ix]
-                        random_song_ix += 1
-                    else:
-                        random_song_ix = np.array([random_song_ix], dtype=np.int64)
-                        latent_x = encoder.predict(random_song_ix, batch_size=1)[0]
-                        random_song_ix = (random_song_ix + 1) % model.layers[0].input_dim
 
-                    if use_pca:
-                        current_params = np.dot(latent_x - latent_means, latent_pca_vectors.T) / latent_pca_values
-                    else:
-                        current_params = (latent_x - latent_means) / latent_stds
+                    if not songs_loaded:
+                        print("Loading songs...")
+                        try:
+                            y_samples = np.load('data/interim/samples.npy')
+                            y_lengths = np.load('data/interim/lengths.npy')
+                            songs_loaded = True
+                        except Exception as e:
+                            print("This functionality is to check if the model training went well by reproducing an original song. "
+                                  "The composer could not load samples and lengths from model training. "
+                                  "If you have the midi files, the model was trained with, process them by using"
+                                  " the preprocess_songs.py to find the requested files in data/interim "
+                                  "(Load exception: {0}".format(e))
 
-                    needs_update = True
-                    audio_reset = True
+                    if songs_loaded:
+                        # check how well the autoencoder can reconstruct a random song
+                        print("Random Song Index: " + str(random_song_ix))
+                        if is_ae:
+                            example_song = y_samples[cur_len:cur_len + num_measures]
+                            current_notes = example_song * 255
+                            latent_x = encoder.predict(np.expand_dims(example_song, 0), batch_size=1)[0]
+                            cur_len += y_lengths[random_song_ix]
+                            random_song_ix += 1
+                        else:
+                            random_song_ix = np.array([random_song_ix], dtype=np.int64)
+                            latent_x = encoder.predict(random_song_ix, batch_size=1)[0]
+                            random_song_ix = (random_song_ix + 1) % model.layers[0].input_dim
+
+                        if use_pca:
+                            current_params = np.dot(latent_x - latent_means, latent_pca_vectors.T) / latent_pca_values
+                        else:
+                            current_params = (latent_x - latent_means) / latent_stds
+
+                        needs_update = True
+                        audio_reset = True
 
                 if event.key == pygame.K_m:  # KEYDOWN M
                     # save song as midi
@@ -522,8 +535,8 @@ def play():
 if __name__ == "__main__":
     # configure parser and parse arguments
     parser = argparse.ArgumentParser(description='Neural Composer: Play and edit music of a trained model.')
-    parser.add_argument('--model', default=sub_dir_name, type=str, help='The folder the model is stored in.')
+    parser.add_argument('--model_path', type=str, help='The folder the model is stored in (e.g. a folder named e and a number located in results/history/).', required=True)
 
     args = parser.parse_args()
-    sub_dir_name = args.model
+    sub_dir_name = args.model_path
     play()
