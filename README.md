@@ -65,6 +65,7 @@ Exclusive to this fork
 	 'B' - Blends smoothly through a series of preset songs by lerping the latent vector. Sounds awesome.
                         Not user friendly, song paths must be hard coded into the keyframe_paths global variable
 			Example result in blended song.mp3 which was recorded with audacity
+			https://drive.google.com/file/d/17MNTsHMXghApAa_GcUMB-pY0PTWWRnIF/view?usp=sharing
 
 If anyone knows how to make loading saved song txts and the blending more user friendly, please make a fork and email me
 michael_einhorn@yahoo.com
