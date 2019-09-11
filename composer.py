@@ -21,22 +21,30 @@ from keras import backend as K
 
 # User constants
 dir_name = 'results/history/'
-sub_dir_name = 'e1/'
+sub_dir_name = 'e2000/'
 sample_rate = 48000
 note_dt = 2000  # num samples
 note_duration = 20000  # num samples
 note_decay = 5.0 / sample_rate
-num_params = 120
+num_params = 40
 num_measures = 16
 num_sigmas = 5.0
 note_threshold = 32
 use_pca = True
 is_ae = True
+autosave = False
+autosavenum = 1
+autosavenow = False
+blend = False
+blendfactor = np.float32(1.0)
+#0 fist sond 1 first to second 2 second song 3 second to first
+blendstate = 0
 
 # colors
 background_color = (210, 210, 210)
 edge_color = (60, 60, 60)
-slider_colors = [(90, 20, 20), (90, 90, 20), (20, 90, 20), (20, 90, 90), (20, 20, 90), (90, 20, 90)]
+slider_colors = [(90, 20, 20), (90, 90, 20), (20, 90, 20),
+                 (20, 90, 90), (20, 20, 90), (90, 20, 90)]
 
 note_w = 96
 note_h = 96
@@ -75,6 +83,7 @@ controls_x = int((window_w - controls_w) / 2)
 controls_y = notes_h + sliders_h
 
 # global variables
+keyframe_paths = np.array(("song 1.txt","song 2.txt", "song 3.txt","song 4.txt","song 5.txt","song 6.txt", ))
 prev_mouse_pos = None
 mouse_pressed = 0
 cur_slider_ix = 0
@@ -83,8 +92,12 @@ volume = 3000
 instrument = 0
 needs_update = True
 current_params = np.zeros((num_params,), dtype=np.float32)
+keyframe_params = np.zeros((len(keyframe_paths),num_params),dtype=np.float32)
 current_notes = np.zeros((num_measures, note_h, note_w), dtype=np.uint8)
 cur_controls = np.array(control_inits, dtype=np.float32)
+keyframe_controls = np.zeros((len(keyframe_paths),len(cur_controls)),dtype=np.float32)
+blend_slerp = False
+keyframe_magnitudes = np.zeros((len(keyframe_paths),),dtype=np.float32)
 songs_loaded = False
 
 # setup audio stream
@@ -111,6 +124,12 @@ def audio_callback(in_data, frame_count, time_info, status):
     global audio_reset
     global note_time
     global note_time_dt
+    global autosavenow
+    global autosave
+    global audio_pause
+    global blendstate
+    global blendfactor
+    global keyframe_paths
 
     # check if needs restart
     if audio_reset:
@@ -132,7 +151,8 @@ def audio_callback(in_data, frame_count, time_info, status):
         if measure_ix >= num_measures:
             break
         note_ix = note_time % note_h
-        notes = np.where(current_notes[measure_ix, note_ix] >= note_threshold)[0]
+        notes = np.where(
+            current_notes[measure_ix, note_ix] >= note_threshold)[0]
         for note in notes:
             freq = 2 * 38.89 * pow(2.0, note / 12.0) / sample_rate
             audio_notes.append((note_time_dt, freq))
@@ -153,6 +173,8 @@ def audio_callback(in_data, frame_count, time_info, status):
             w = 2 * np.abs(np.mod(x * f - 0.5, 2) - 1) - 1  # Triangle
         elif instrument == 3:
             w = np.sin(x * f * math.pi)  # Sine
+        elif instrument == 4:
+            w = -1 * np.sign(np.mod(2*x*f,4)-2) * np.sqrt( 1-( ( np.mod(2*x*f,2)-1) *( ( np.mod(2*x*f,2)-1) ) ))  # Circle
 
         # w = np.floor(w*8)/8
         w[x == 0] = 0
@@ -162,14 +184,20 @@ def audio_callback(in_data, frame_count, time_info, status):
 
     # remove notes that are too old
     audio_time += frame_count
-    audio_notes = [(t, f) for t, f in audio_notes if audio_time < t + note_duration]
-
+    audio_notes = [(t, f)
+                   for t, f in audio_notes if audio_time < t + note_duration]
+    blendfactor = (np.cos( ((note_time / note_h)/num_measures) * math.pi )+1)/2
+    #print(blendfactor)
     # reset if loop occurs
     if note_time / note_h >= num_measures:
         audio_time = 0
         note_time = 0
         note_time_dt = 0
         audio_notes = []
+        blendstate = (blendstate+1)%(2*len(keyframe_paths))
+        blendfactor = 1
+        if autosave and not autosavenow:
+            autosavenow = True
 
     # return the sound clip
     return data.tobytes(), pyaudio.paContinue
@@ -272,13 +300,15 @@ def draw_sliders(screen):
         cx_1 = x + tick_pad
         cx_2 = x + slider_w - tick_pad
         for j in range(int(num_sigmas * 2 + 1)):
-            ly = y + slider_h / 2.0 + (j - num_sigmas) * slider_h / (num_sigmas * 2.0)
+            ly = y + slider_h / 2.0 + \
+                (j - num_sigmas) * slider_h / (num_sigmas * 2.0)
             ly = int(ly)
             col = (0, 0, 0) if j - num_sigmas == 0 else slider_color
             pygame.draw.line(screen, col, (cx_1, ly), (cx_2, ly))
 
         py = y + int((current_params[i] / (num_sigmas * 2) + 0.5) * slider_h)
-        pygame.draw.circle(screen, slider_color, (int(cx), int(py)), int((slider_w - tick_pad) / 2))
+        pygame.draw.circle(screen, slider_color, (int(
+            cx), int(py)), int((slider_w - tick_pad) / 2))
 
 
 def get_pianoroll_from_notes(notes):
@@ -298,7 +328,8 @@ def get_pianoroll_from_notes(notes):
 
             measure = np.rot90(notes[ix])
             played_only = np.where(measure >= note_threshold, 255, 0)
-            output[0, y:y + note_h, x:x + note_w] = np.minimum(measure * (255.0 / note_threshold), 255.0)
+            output[0, y:y + note_h, x:x +
+                   note_w] = np.minimum(measure * (255.0 / note_threshold), 255.0)
             output[1, y:y + note_h, x:x + note_w] = played_only
             output[2, y:y + note_h, x:x + note_w] = played_only
 
@@ -313,12 +344,15 @@ def draw_notes(screen, notes_surface):
     :return:
     """
 
-    pygame.surfarray.blit_array(notes_surface, get_pianoroll_from_notes(current_notes))
+    pygame.surfarray.blit_array(
+        notes_surface, get_pianoroll_from_notes(current_notes))
 
     measure_ix = int(note_time / note_h)
     note_ix = note_time % note_h
-    x = notes_x + note_pad + (measure_ix % notes_cols) * (note_w + note_pad * 2) + note_ix
-    y = notes_y + note_pad + int(measure_ix / notes_cols) * (note_h + note_pad * 2)
+    x = notes_x + note_pad + (measure_ix % notes_cols) * \
+        (note_w + note_pad * 2) + note_ix
+    y = notes_y + note_pad + \
+        int(measure_ix / notes_cols) * (note_h + note_pad * 2)
 
     pygame.draw.rect(screen, (255, 255, 0), (x, y, 4, note_h), 0)
 
@@ -333,6 +367,18 @@ def play():
     global audio_reset
     global instrument
     global songs_loaded
+    global autosavenow
+    global autosavenum
+    global autosave
+    global blend
+    global blendstate
+    global blendfactor
+    global keyframe_params
+    global keyframe_controls
+    global keyframe_paths
+    global cur_controls
+    global keyframe_magnitudes
+    global blend_slerp
 
     print("Keras version: " + keras.__version__)
 
@@ -340,15 +386,18 @@ def play():
 
     print("Loading encoder...")
     model = load_model(dir_name + 'model.h5')
-    encoder = Model(inputs=model.input, outputs=model.get_layer('encoder').output)
+    encoder = Model(inputs=model.input,
+                    outputs=model.get_layer('encoder').output)
     decoder = K.function([model.get_layer('decoder').input, K.learning_phase()],
                          [model.layers[-1].output])
 
     print("Loading gaussian/pca statistics...")
     latent_means = np.load(dir_name + sub_dir_name + '/latent_means.npy')
     latent_stds = np.load(dir_name + sub_dir_name + '/latent_stds.npy')
-    latent_pca_values = np.load(dir_name + sub_dir_name + '/latent_pca_values.npy')
-    latent_pca_vectors = np.load(dir_name + sub_dir_name + '/latent_pca_vectors.npy')
+    latent_pca_values = np.load(
+        dir_name + sub_dir_name + '/latent_pca_values.npy')
+    latent_pca_vectors = np.load(
+        dir_name + sub_dir_name + '/latent_pca_vectors.npy')
 
     # open a window
     pygame.init()
@@ -370,9 +419,60 @@ def play():
     running = True
     random_song_ix = 0
     cur_len = 0
+    blendcycle = 0
     apply_controls()
     while running:
         # process events
+        if autosavenow:
+            # generate random song
+            current_params = np.clip(np.random.normal(
+                0.0, 1.0, (num_params,)), -num_sigmas, num_sigmas)
+            needs_update = True
+            audio_reset = True
+            # save slider values
+            with open("results/history/autosave" + str(autosavenum)+".txt", "w") as text_file:
+                text_file.write(sub_dir_name + "\n")
+                text_file.write(str(instrument) + "\n")
+                for iter in cur_controls:
+                    text_file.write(str(iter) + "\n")
+                for iter in current_params:
+                    text_file.write(str(iter) + "\n")
+            # save song as wave
+            audio_pause = True
+            audio_reset = True
+            save_audio = b''
+            while True:
+                save_audio += audio_callback(None, 1024, None, None)[0]
+                if audio_time == 0:
+                    break
+            wave_output = wave.open('results/history/autosave' + str(autosavenum)+'.wav', 'w')
+            wave_output.setparams(
+                (1, 2, sample_rate, 0, 'NONE', 'not compressed'))
+            wave_output.writeframes(save_audio)
+            wave_output.close()
+            audio_pause = False
+            autosavenum += 1
+            autosavenow = False
+            needs_update = True
+            audio_reset = True
+        blendcycle += 1
+        if blend and blendcycle > 10:
+            blendcycle = 0
+            if blendstate%2 == 0:
+                needs_update = True
+                current_params = np.copy(keyframe_params[int(blendstate/2)])
+                cur_controls = np.copy(keyframe_controls[int(blendstate/2)])
+                apply_controls()
+            elif blendstate%2 == 1:
+                for x in range(0,len(current_params)):
+                    current_params[x] = (blendfactor * keyframe_params[int(blendstate/2),x]) + ((1-blendfactor)*keyframe_params[((int(blendstate/2))+1)%len(keyframe_paths),x])
+                if blend_slerp:
+                    magnitude = (blendfactor * keyframe_magnitudes[int(blendstate/2)]) + ((1-blendfactor)*keyframe_magnitudes[((int(blendstate/2))+1)%len(keyframe_paths)])
+                    current_params = current_params * ((sum(current_params*current_params)**-0.5) * magnitude)
+                for x in range(0,len(cur_controls)):
+                    cur_controls[x] = (blendfactor * keyframe_controls[int(blendstate/2),x]) + ((1-blendfactor)*keyframe_controls[((int(blendstate/2))+1)%len(keyframe_paths),x])
+                apply_controls()
+                needs_update = True
         for event in pygame.event.get():
             if event.type == pygame.QUIT:  # QUIT BUTTON HIT
                 running = False
@@ -397,16 +497,61 @@ def play():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:  # KEYDOWN R
                     # generate random song
-                    current_params = np.clip(np.random.normal(0.0, 1.0, (num_params,)), -num_sigmas, num_sigmas)
+                    current_params = np.clip(np.random.normal(
+                        0.0, 1.0, (num_params,)), -num_sigmas, num_sigmas)
                     needs_update = True
                     audio_reset = True
-
+                if event.key == pygame.K_t:  # KEYDOWN T
+                    for x in range(int(num_params/3)+1, num_params):
+                        current_params[x] = np.clip(np.random.normal(0.0,1.0), -num_sigmas, num_sigmas)
+                    needs_update = True
+                if event.key == pygame.K_x:  # KEYDOWN X
+                    # generate random song
+                    current_params += np.clip(np.random.normal(
+                        0.0, 0.3, (num_params,)), -num_sigmas, num_sigmas)
+                    needs_update = True
+                if event.key == pygame.K_a:  # KEYDOWN A
+                    autosave = not autosave
+                if event.key == pygame.K_b:  # KEYDOWN B
+                    blend = not blend
+                    blendstate = 0
+                    blendfactor = 1.0
+                    for y in range(len(keyframe_paths)):
+                        fo = open("results/history/" + keyframe_paths[y], "r")
+                        if not sub_dir_name == fo.readline()[:-1]:
+                            running = false
+                            print("incompatable with current model")
+                            break
+                        instrument = int(fo.readline())
+                        for x in range(len(cur_controls)):
+                            keyframe_controls[y,x] = float(fo.readline())
+                        for x in range(len(current_params)):
+                            keyframe_params[y,x] = float(fo.readline())
+                        keyframe_magnitudes[y] = sum(keyframe_params[y]*keyframe_params[y])**0.5
                 if event.key == pygame.K_e:  # KEYDOWN E
                     # generate random song with larger variance
                     current_params = np.clip(np.random.normal(0.0, 2.0, (num_params,)), -num_sigmas, num_sigmas)
                     needs_update = True
                     audio_reset = True
-
+                if event.key == pygame.K_PERIOD:
+                    current_params /= 1.1
+                    needs_update = True
+                if event.key == pygame.K_COMMA:
+                    current_params *= 1.1
+                    needs_update = True
+                if event.key == pygame.K_SLASH:
+                    current_params *= -1
+                    needs_update = True
+                if event.key == pygame.K_s:  # KEYDOWN S
+                    # save slider values
+                    with open("results/history/sliders.txt", "w") as text_file:
+                        text_file.write(sub_dir_name + "\n")
+                        text_file.write(str(instrument) + "\n")
+                        for iter in cur_controls:
+                             text_file.write(str(iter) + "\n")
+                        for iter in current_params:
+                             text_file.write(str(iter) + "\n")
+                
                 if event.key == pygame.K_o:  # KEYDOWN O
 
                     if not songs_loaded:
@@ -428,18 +573,24 @@ def play():
                         if is_ae:
                             example_song = y_samples[cur_len:cur_len + num_measures]
                             current_notes = example_song * 255
-                            latent_x = encoder.predict(np.expand_dims(example_song, 0), batch_size=1)[0]
+                            latent_x = encoder.predict(np.expand_dims(
+                                example_song, 0), batch_size=1)[0]
                             cur_len += y_lengths[random_song_ix]
                             random_song_ix += 1
                         else:
-                            random_song_ix = np.array([random_song_ix], dtype=np.int64)
-                            latent_x = encoder.predict(random_song_ix, batch_size=1)[0]
-                            random_song_ix = (random_song_ix + 1) % model.layers[0].input_dim
+                            random_song_ix = np.array(
+                                [random_song_ix], dtype=np.int64)
+                            latent_x = encoder.predict(
+                                random_song_ix, batch_size=1)[0]
+                            random_song_ix = (
+                                random_song_ix + 1) % model.layers[0].input_dim
 
                         if use_pca:
-                            current_params = np.dot(latent_x - latent_means, latent_pca_vectors.T) / latent_pca_values
+                            current_params = np.dot(
+                                latent_x - latent_means, latent_pca_vectors.T) / latent_pca_values
                         else:
-                            current_params = (latent_x - latent_means) / latent_stds
+                            current_params = (
+                                latent_x - latent_means) / latent_stds
 
                         needs_update = True
                         audio_reset = True
@@ -448,7 +599,8 @@ def play():
                     # save song as midi
                     audio_pause = True
                     audio_reset = True
-                    midi_utils.samples_to_midi(current_notes, 'results/live.mid', note_threshold)
+                    midi_utils.samples_to_midi(
+                        current_notes, 'results/history/live.mid', note_threshold)
                     audio_pause = False
 
                 if event.key == pygame.K_w:  # KEYDOWN W
@@ -460,8 +612,9 @@ def play():
                         save_audio += audio_callback(None, 1024, None, None)[0]
                         if audio_time == 0:
                             break
-                    wave_output = wave.open('results/live.wav', 'w')
-                    wave_output.setparams((1, 2, sample_rate, 0, 'NONE', 'not compressed'))
+                    wave_output = wave.open('results/history/live.wav', 'w')
+                    wave_output.setparams(
+                        (1, 2, sample_rate, 0, 'NONE', 'not compressed'))
                     wave_output.writeframes(save_audio)
                     wave_output.close()
                     audio_pause = False
@@ -478,6 +631,8 @@ def play():
                 if event.key == pygame.K_TAB:  # KEYDOWN TAB
                     # reset audio playing
                     audio_reset = True
+                    if autosave and not autosavenow:
+                        autosavenow = True
 
                 if event.key == pygame.K_1:  # KEYDOWN 1
                     # play instrument 0
@@ -495,20 +650,29 @@ def play():
                     # play instrument 3
                     instrument = 3
 
+                if event.key == pygame.K_5:  # KEYDOWN 5
+                    # play instrument 4
+                    instrument = 4
+
                 if event.key == pygame.K_c:  # KEYDOWN C
                     #
-                    y = np.expand_dims(np.where(current_notes > note_threshold, 1, 0), 0)
+                    y = np.expand_dims(
+                        np.where(current_notes > note_threshold, 1, 0), 0)
                     latent_x = encoder.predict(y)[0]
                     if use_pca:
-                        current_params = np.dot(latent_x - latent_means, latent_pca_vectors.T) / latent_pca_values
+                        current_params = np.dot(
+                            latent_x - latent_means, latent_pca_vectors.T) / latent_pca_values
                     else:
-                        current_params = (latent_x - latent_means) / latent_stds
+                        current_params = (
+                            latent_x - latent_means) / latent_stds
                     needs_update = True
 
         # check if params were changed so that a new song should be generated
         if needs_update:
             if use_pca:
-                latent_x = latent_means + np.dot(current_params * latent_pca_values, latent_pca_vectors)
+                latent_x = latent_means + \
+                    np.dot(current_params * latent_pca_values,
+                           latent_pca_vectors)
             else:
                 latent_x = latent_means + latent_stds * current_params
             latent_x = np.expand_dims(latent_x, axis=0)
@@ -534,9 +698,23 @@ def play():
 
 if __name__ == "__main__":
     # configure parser and parse arguments
-    parser = argparse.ArgumentParser(description='Neural Composer: Play and edit music of a trained model.')
-    parser.add_argument('--model_path', type=str, help='The folder the model is stored in (e.g. a folder named e and a number located in results/history/).', required=True)
+    parser = argparse.ArgumentParser(
+        description='Neural Composer: Play and edit music of a trained model.')
+    parser.add_argument('--model_path', type=str,
+                        help='The folder the model is stored in (e.g. a folder named e and a number located in results/history/).', required=True)
 
     args = parser.parse_args()
-    sub_dir_name = args.model_path
+    if args.model_path.endswith(".txt"):
+        fo = open("results/history/" + args.model_path, "r")
+        print (fo.name)
+        sub_dir_name = fo.readline()[:-1]
+        print(sub_dir_name)
+        instrument = int(fo.readline())
+        for x in range(len(cur_controls)):
+            cur_controls[x] = float(fo.readline())
+        for x in range(len(current_params)):
+            current_params[x] = float(fo.readline())
+        
+    else:
+        sub_dir_name = args.model_path
     play()

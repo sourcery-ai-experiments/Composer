@@ -24,12 +24,12 @@ import keras
 print("Keras version: " + keras.__version__)
 
 from keras.models import Model, load_model
-from keras.utils import plot_model
+#from keras.utils import plot_model
 from keras import backend as K
 from keras.losses import binary_crossentropy
 from keras.optimizers import Adam, RMSprop
 
-EPOCHS_QTY = 2000
+EPOCHS_QTY = 3000
 EPOCHS_TO_SAVE = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450]
 LEARNING_RATE = 0.001  # learning rate
 CONTINUE_TRAIN = False
@@ -48,14 +48,14 @@ VAE_B2 = 0.1
 
 BATCH_SIZE = 350
 MAX_WINDOWS = 16  # the maximal number of measures a song can have
-LATENT_SPACE_SIZE = 120
+LATENT_SPACE_SIZE = 40
 NUM_OFFSETS = 16 if USE_EMBEDDING else 1
 
 K.set_image_data_format('channels_first')
 
 # Fix the random seed so that training comparisons are easier to make
-np.random.seed(0)
-random.seed(0)
+np.random.seed(42)
+random.seed(42)
 
 
 def vae_loss(x, x_decoded_mean, z_log_sigma_sq, z_mean):
@@ -274,10 +274,10 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
             model.compile(optimizer=RMSprop(lr=learning_rate), loss='binary_crossentropy')
 
         # plot model with graphvis if installed
-        try:
-            plot_model(model, to_file='results/model.png', show_shapes=True)
-        except OSError as e:
-            print(e)
+        #try:
+       #     plot_model(model, to_file='results/model.png', show_shapes=True)
+        #except OSError as e:
+        #    print(e)
 
     #  train
     print("Referencing sub-models...")
