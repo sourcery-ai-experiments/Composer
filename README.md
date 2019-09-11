@@ -36,16 +36,39 @@ YouTube channel 'CodeParade'.  Have fun making music!
 Composer Controls:
  Right Click - Reset all sliders
          'R' - Random Song
-         'T' - Randomize off-screen sliders
-         'M' - Save song as .mid file
+	 'E' - Random Song 2 stdev
+	 'M' - Save song as .mid file
          'W' - Save song as .wav file
-         'S' - Save slider values to text file
-     'Space' - Play/Pause
-       'Tab' - Seek to start of song
+	 'O' - opens the loaded samples and plays the reconstructed version of one of the input songs
+         'C' - Does a thing, no idea how it works or what it does
+	 'Escape' - Quit
+	 'Space' - Play/Pause
+         'Tab' - Seek to start of song
          '1' - Square wave instrument
          '2' - Sawtooth wave instrument
          '3' - Triangle wave instrument
          '4' - Sine wave instrument
+	
+Exclusive to this fork
+	 '5' - Circle wave instrument
+         'T' - Randomizes last 2/3 of sliders
+         'X' - Randomly alters each slider (add a random number 0.1 stdev to the current value)
+         ',' - Multiplies each slider by 1.1 (I chose comma because on my keyboard it is the lowercase of <)
+	 '.' - Divides each slider by 1.1 (I chose period because on my keyboard it is the lowercase of >)
+	 '/' - Multiplies each sliders by -1
+         'S' - Save slider values to text file (includes threshold, speed and volume sliders, model path and instrument number)
+			To load a saved song run the command >py composer.py --model_path song1.txt
+			It knows to load the saved song file because of the .txt extension and gets the model path from inside the file
+
+         'A' - Toggles auto save whenever the song finishes, it is saved and a new song is randomly generated.
+			Could be useful if you are listening while doing something else and want to look back on the history.
+	 'B' - Blends smoothly through a series of preset songs by lerping the latent vector. Sounds awesome.
+                        Not user friendly, song paths must be hard coded into the keyframe_paths global variable
+			Example result in blended song.mp3 which was recorded with audacity
+
+If anyone knows how to make loading saved song txts and the blending more user friendly, please make a fork and email me
+michael_einhorn@yahoo.com
+	 
 ```
 
 ## Pretrained models
