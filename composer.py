@@ -58,12 +58,12 @@ slider_h = 200
 slider_pad = 5
 tick_pad = 4
 
-control_w = 210
+control_w = 190
 control_h = 30
 control_pad = 5
-control_num = 3
-control_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
-control_inits = [0.75, 0.5, 0.5]
+control_num = 4
+control_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
+control_inits = [0.75, 0.5, 0.5, 0.5]
 
 # derived constants
 notes_w = notes_cols * (note_w + note_pad * 2)
@@ -83,7 +83,7 @@ controls_x = int((window_w - controls_w) / 2)
 controls_y = notes_h + sliders_h
 
 # global variables
-keyframe_paths = np.array(("song 1.txt","song 2.txt", "song 3.txt","song 4.txt","song 5.txt","song 6.txt", ))
+keyframe_paths = np.array(("song 1.txt","song 6.txt", "song 8.txt","song 13.txt", "song 23.txt"))
 prev_mouse_pos = None
 mouse_pressed = 0
 cur_slider_ix = 0
@@ -195,6 +195,8 @@ def audio_callback(in_data, frame_count, time_info, status):
         note_time_dt = 0
         audio_notes = []
         blendstate = (blendstate+1)%(2*len(keyframe_paths))
+        if blendstate == 0:
+            audio_pause = True
         blendfactor = 1
         if autosave and not autosavenow:
             autosavenow = True
@@ -234,10 +236,16 @@ def apply_controls():
     global note_threshold
     global note_dt
     global volume
+    global note_duration
+    global note_decay
+    global sample_rate
 
     note_threshold = (1.0 - cur_controls[0]) * 200 + 10
     note_dt = (1.0 - cur_controls[1]) * 1800 + 200
     volume = cur_controls[2] * 6000
+
+    note_duration = 10000 / ((1-cur_controls[3]) + 0.001)
+    note_decay = 10 * (1 - cur_controls[3]) / sample_rate
 
 
 def update_mouse_move(mouse_pos):
