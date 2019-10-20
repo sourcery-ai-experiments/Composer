@@ -48,6 +48,9 @@ Composer Controls:
          '2' - Sawtooth wave instrument
          '3' - Triangle wave instrument
          '4' - Sine wave instrument
+	 Red Slider - Threshold to play a note
+	 Green Slider - Speed of song
+	 Blue Slider - Volume
 	
 Exclusive to this fork
 	 '5' - Circle wave instrument
@@ -59,7 +62,7 @@ Exclusive to this fork
          'S' - Save slider values to text file (includes threshold, speed and volume sliders, model path and instrument number)
 			To load a saved song run the command >py composer.py --model_path song1.txt
 			It knows to load the saved song file because of the .txt extension and gets the model path from inside the file
-
+	 Yellow Slider - Note Duration
          'A' - Toggles auto save whenever the song finishes, it is saved and a new song is randomly generated.
 			Could be useful if you are listening while doing something else and want to look back on the history.
 	 'B' - Blends smoothly through a series of preset songs by lerping the latent vector. Sounds awesome.
