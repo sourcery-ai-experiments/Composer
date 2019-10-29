@@ -53,6 +53,8 @@ Composer Controls:
 	 Blue Slider - Volume
 	
 Exclusive to this fork
+	 Yellow Slider - Note Duration
+	 Cyan Slider - Note Balance (Makes low notes louder than high notes or vise versa)
 	 '5' - Circle wave instrument
          'T' - Randomizes last 2/3 of sliders
          'X' - Randomly alters each slider (add a random number 0.1 stdev to the current value)
@@ -60,17 +62,21 @@ Exclusive to this fork
 	 '.' - Divides each slider by 1.1 (I chose period because on my keyboard it is the lowercase of >)
 	 '/' - Multiplies each sliders by -1
          'S' - Save slider values to text file (includes threshold, speed and volume sliders, model path and instrument number)
+			Asks in command line what filename to save as
 			To load a saved song run the command >py composer.py --model_path song1.txt
 			It knows to load the saved song file because of the .txt extension and gets the model path from inside the file
-	 Yellow Slider - Note Duration
+			If blend mode is on, it will save a file containing the names of the blended songs that can be opened in the same ways
+	 'L' - Loads a song
+			Asks in command line what song file (created by the S command above) to open and play without closing the app
          'A' - Toggles auto save whenever the song finishes, it is saved and a new song is randomly generated.
 			Could be useful if you are listening while doing something else and want to look back on the history.
-	 'B' - Blends smoothly through a series of preset songs by lerping the latent vector. Sounds awesome.
-                        Not user friendly, song paths must be hard coded into the keyframe_paths global variable
+	 'B' - Blends smoothly through a series of preset songs by taking a linear combination of the latent vectors. Sounds awesome.
+			asks in command line what song files (created by the S command above) to blend
 			Example result in blended song.mp3 which was recorded with audacity
 			https://drive.google.com/file/d/17MNTsHMXghApAa_GcUMB-pY0PTWWRnIF/view?usp=sharing
 
-If anyone knows how to make loading saved song txts and the blending more user friendly, please make a fork and email me
+I would have liked the text entry to be in a box to the right of the notes rather than in command line, but I couldn't figure out how to do that
+If you can help with that please make a pull request and email me at
 michael_einhorn@yahoo.com
 	 
 ```

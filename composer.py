@@ -37,7 +37,7 @@ autosavenum = 1
 autosavenow = False
 blend = False
 blendfactor = np.float32(1.0)
-#0 fist sond 1 first to second 2 second song 3 second to first
+#0 first sond 1 first to second 2 second song 3 second to first
 blendstate = 0
 
 # colors
@@ -58,12 +58,12 @@ slider_h = 200
 slider_pad = 5
 tick_pad = 4
 
-control_w = 190
+control_w = 200
 control_h = 30
 control_pad = 5
-control_num = 4
-control_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
-control_inits = [0.75, 0.5, 0.5, 0.5]
+control_num = 5
+control_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (0, 255, 255), (255, 255, 0)]
+control_inits = [0.75, 0.5, 0.5, 0.5, 0.5]
 
 # derived constants
 notes_w = notes_cols * (note_w + note_pad * 2)
@@ -72,23 +72,28 @@ sliders_w = notes_w
 sliders_h = slider_h + slider_pad * 2
 controls_w = control_w * control_num
 controls_h = control_h
-window_w = notes_w
+window_w = max(notes_w, controls_w)
 window_h = notes_h + sliders_h + controls_h
 slider_w = int((window_w - slider_pad * 2) / slider_num)
 notes_x = 0
 notes_y = sliders_h
+text_x = notes_w + 5
+text_y = notes_y + 5
+text_h = 40
+text_w = 200
 sliders_x = slider_pad
 sliders_y = slider_pad
 controls_x = int((window_w - controls_w) / 2)
 controls_y = notes_h + sliders_h
 
 # global variables
-keyframe_paths = np.array(("song 1.txt","song 6.txt", "song 8.txt","song 13.txt", "song 23.txt"))
+keyframe_paths = np.array(("deku.txt", "lanayru.txt", ))
 prev_mouse_pos = None
 mouse_pressed = 0
 cur_slider_ix = 0
 cur_control_ix = 0
 volume = 3000
+balance = 0.5
 instrument = 0
 needs_update = True
 current_params = np.zeros((num_params,), dtype=np.float32)
@@ -130,6 +135,7 @@ def audio_callback(in_data, frame_count, time_info, status):
     global blendstate
     global blendfactor
     global keyframe_paths
+    global balance
 
     # check if needs restart
     if audio_reset:
@@ -178,7 +184,8 @@ def audio_callback(in_data, frame_count, time_info, status):
 
         # w = np.floor(w*8)/8
         w[x == 0] = 0
-        w *= volume * np.exp(-x * note_decay)
+        n = 12 * np.log (f * sample_rate / 38.89) / np.log(2);
+        w *= volume * np.exp(-x * note_decay) * pow(balance, (n - 60) / 12.0) / np.log(2)
         data += w
     data = np.clip(data, -32000, 32000).astype(np.int16)
 
@@ -195,8 +202,8 @@ def audio_callback(in_data, frame_count, time_info, status):
         note_time_dt = 0
         audio_notes = []
         blendstate = (blendstate+1)%(2*len(keyframe_paths))
-        if blendstate == 0:
-            audio_pause = True
+        #if blendstate == 0:
+            #audio_pause = True
         blendfactor = 1
         if autosave and not autosavenow:
             autosavenow = True
@@ -239,13 +246,15 @@ def apply_controls():
     global note_duration
     global note_decay
     global sample_rate
+    global balance
 
     note_threshold = (1.0 - cur_controls[0]) * 200 + 10
     note_dt = (1.0 - cur_controls[1]) * 1800 + 200
     volume = cur_controls[2] * 6000
+    balance = pow(2, cur_controls[3] * 4 - 2);
 
-    note_duration = 10000 / ((1-cur_controls[3]) + 0.001)
-    note_decay = 10 * (1 - cur_controls[3]) / sample_rate
+    note_duration = 10000 / ((1-cur_controls[4]) + 0.001)
+    note_decay = 10 * (1 - cur_controls[4]) / sample_rate
 
 
 def update_mouse_move(mouse_pos):
@@ -524,18 +533,30 @@ def play():
                     blend = not blend
                     blendstate = 0
                     blendfactor = 1.0
-                    for y in range(len(keyframe_paths)):
-                        fo = open("results/history/" + keyframe_paths[y], "r")
-                        if not sub_dir_name == fo.readline()[:-1]:
-                            running = false
-                            print("incompatable with current model")
-                            break
-                        instrument = int(fo.readline())
-                        for x in range(len(cur_controls)):
-                            keyframe_controls[y,x] = float(fo.readline())
-                        for x in range(len(current_params)):
-                            keyframe_params[y,x] = float(fo.readline())
-                        keyframe_magnitudes[y] = sum(keyframe_params[y]*keyframe_params[y])**0.5
+                    if blend:
+                        audio_pause = True
+                        audio_reset = True
+                        needs_update = True
+                        blendnum = int(input("The number of songs to be blended "))
+                        keyframe_paths = []
+                        keyframe_controls = np.zeros((blendnum,len(cur_controls)),dtype=np.float32)
+                        keyframe_params = np.zeros((blendnum,num_params),dtype=np.float32)
+                        for y in range(blendnum):
+                            fileName = input("The file name of the next song to be blended ")
+                            if "." not in fileName:
+                                fileName = fileName + ".txt"
+                            keyframe_paths.append((fileName))
+                            fo = open("results/history/" + fileName, "r")
+                            if not sub_dir_name == fo.readline()[:-1]:
+                                running = false
+                                print("incompatable with current model")
+                                break
+                            instrument = int(fo.readline())
+                            for x in range(len(cur_controls)):
+                                keyframe_controls[y,x] = float(fo.readline())
+                            for x in range(len(current_params)):
+                                keyframe_params[y,x] = float(fo.readline())
+                            #keyframe_magnitudes[y] = sum(keyframe_params[y]*keyframe_params[y])**0.5
                 if event.key == pygame.K_e:  # KEYDOWN E
                     # generate random song with larger variance
                     current_params = np.clip(np.random.normal(0.0, 2.0, (num_params,)), -num_sigmas, num_sigmas)
@@ -552,14 +573,63 @@ def play():
                     needs_update = True
                 if event.key == pygame.K_s:  # KEYDOWN S
                     # save slider values
-                    with open("results/history/sliders.txt", "w") as text_file:
-                        text_file.write(sub_dir_name + "\n")
-                        text_file.write(str(instrument) + "\n")
-                        for iter in cur_controls:
-                             text_file.write(str(iter) + "\n")
-                        for iter in current_params:
-                             text_file.write(str(iter) + "\n")
-                
+                    audio_pause = True
+                    fileName = input("File Name to save into ")
+                    if "." not in fileName:
+                        fileName = fileName + ".txt"
+                    with open("results/history/" + fileName, "w") as text_file:
+                        if blend:
+                            text_file.write(sub_dir_name + "\n")
+                            text_file.write("blended song" + "\n")
+                            text_file.write(str(len(keyframe_paths)) + "\n")
+                            for x in range(len(keyframe_paths)):
+                                text_file.write("" + keyframe_paths[x] + "\n")
+                        else:
+                            text_file.write(sub_dir_name + "\n")
+                            text_file.write(str(instrument) + "\n")
+                            for iter in cur_controls:
+                                text_file.write(str(iter) + "\n")
+                            for iter in current_params:
+                                text_file.write(str(iter) + "\n")
+                if event.key == pygame.K_l:  # KEYDOWN L
+                    audio_pause = True
+                    needs_update = True
+                    audio_reset = True
+                    fileName = input("File Name to read ")
+                    if "." not in fileName:
+                        fileName = fileName + ".txt"
+                    fo = open("results/history/" + fileName, "r")
+                    print (fo.name)
+                    if not sub_dir_name == fo.readline()[:-1]:
+                                running = false
+                                print("incompatable with current model")
+                                break
+                    tempDir = fo.readline()
+                    if tempDir.startswith("blended song"):
+                        blend = True
+                        blendnum = int(fo.readline())
+                        keyframe_paths = []
+                        keyframe_controls = np.zeros((blendnum,len(cur_controls)),dtype=np.float32)
+                        keyframe_params = np.zeros((blendnum,num_params),dtype=np.float32)
+                        for y in range(blendnum):
+                            fileName2 = fo.readline()[:-1]
+                            keyframe_paths.append(fileName)
+                            fo2 = open("results/history/" + fileName2, "r")
+                            if not sub_dir_name == fo2.readline()[:-1]:
+                                running = false
+                                print("incompatable with current model")
+                                break
+                            instrument = int(fo2.readline())
+                            for x in range(len(cur_controls)):
+                                keyframe_controls[y,x] = float(fo2.readline())
+                            for x in range(len(current_params)):
+                                keyframe_params[y,x] = float(fo2.readline())
+                    else:
+                        instrument = int(tempDir)
+                        for x in range(len(cur_controls)):
+                            cur_controls[x] = float(fo.readline())
+                        for x in range(len(current_params)):
+                            current_params[x] = float(fo.readline())
                 if event.key == pygame.K_o:  # KEYDOWN O
 
                     if not songs_loaded:
@@ -607,20 +677,26 @@ def play():
                     # save song as midi
                     audio_pause = True
                     audio_reset = True
+                    fileName = input("File Name to save into ")
+                    if "." not in fileName:
+                        fileName = fileName + ".mid"
                     midi_utils.samples_to_midi(
-                        current_notes, 'results/history/live.mid', note_threshold)
+                        current_notes, 'results/history/' + fileName, note_threshold)
                     audio_pause = False
 
                 if event.key == pygame.K_w:  # KEYDOWN W
                     # save song as wave
                     audio_pause = True
                     audio_reset = True
+                    fileName = input("File Name to save into ")
+                    if "." not in fileName:
+                        fileName = fileName + ".wav"
                     save_audio = b''
                     while True:
                         save_audio += audio_callback(None, 1024, None, None)[0]
                         if audio_time == 0:
                             break
-                    wave_output = wave.open('results/history/live.wav', 'w')
+                    wave_output = wave.open('results/history/' + fileName + '.wav', 'w')
                     wave_output.setparams(
                         (1, 2, sample_rate, 0, 'NONE', 'not compressed'))
                     wave_output.writeframes(save_audio)
@@ -716,12 +792,33 @@ if __name__ == "__main__":
         fo = open("results/history/" + args.model_path, "r")
         print (fo.name)
         sub_dir_name = fo.readline()[:-1]
-        print(sub_dir_name)
-        instrument = int(fo.readline())
-        for x in range(len(cur_controls)):
-            cur_controls[x] = float(fo.readline())
-        for x in range(len(current_params)):
-            current_params[x] = float(fo.readline())
+        tempDir = fo.readline()
+        if tempDir.startswith("blended song"):
+            blend = True
+            blendnum = int(fo.readline())
+            keyframe_paths = []
+            keyframe_controls = np.zeros((blendnum,len(cur_controls)),dtype=np.float32)
+            keyframe_params = np.zeros((blendnum,num_params),dtype=np.float32)
+            for y in range(blendnum):
+                fileName2 = fo.readline()[:-1]
+                keyframe_paths[y] = fileName
+                fo2 = open("results/history/" + fileName2, "r")
+                if not sub_dir_name == fo2.readline()[:-1]:
+                    running = false
+                    print("incompatable with current model")
+                    break
+                instrument = int(fo2.readline())
+                for x in range(len(cur_controls)):
+                    keyframe_controls[y,x] = float(fo.readline())
+                for x in range(len(current_params)):
+                    keyframe_params[y,x] = float(fo.readline())
+        else:
+            print(sub_dir_name)
+            instrument = int(tempDir)
+            for x in range(len(cur_controls)):
+                cur_controls[x] = float(fo.readline())
+            for x in range(len(current_params)):
+                current_params[x] = float(fo.readline())
         
     else:
         sub_dir_name = args.model_path
