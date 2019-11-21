@@ -60,7 +60,9 @@ Exclusive to this fork
          'X' - Randomly alters each slider (add a random number 0.1 stdev to the current value)
          ',' - Multiplies each slider by 1.1 (I chose comma because on my keyboard it is the lowercase of <)
 	 '.' - Divides each slider by 1.1 (I chose period because on my keyboard it is the lowercase of >)
-	 '/' - Multiplies each sliders by -1
+	 '/' - Multiplies each slider by -1
+	 Up Arrow - increments the note threshold (Useful for trying to add one note at a time)
+	 Down Arrow - decrements the note threshold (Useful for trying to remove one note at a time)
          'S' - Save slider values to text file (includes threshold, speed and volume sliders, model path and instrument number)
 			Asks in command line what filename to save as
 			To load a saved song run the command >py composer.py --model_path song1.txt

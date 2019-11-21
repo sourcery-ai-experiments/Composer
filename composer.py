@@ -30,6 +30,8 @@ num_params = 40
 num_measures = 16
 num_sigmas = 5.0
 note_threshold = 32
+next_threshold = 33
+prev_threshold = 31
 use_pca = True
 is_ae = True
 autosave = False
@@ -87,7 +89,7 @@ controls_x = int((window_w - controls_w) / 2)
 controls_y = notes_h + sliders_h
 
 # global variables
-keyframe_paths = np.array(("deku.txt", "lanayru.txt", ))
+keyframe_paths = np.array(("song 1.txt", "song 2.txt", ))
 prev_mouse_pos = None
 mouse_pressed = 0
 cur_slider_ix = 0
@@ -264,7 +266,9 @@ def update_mouse_move(mouse_pos):
     :return:
     """
     global needs_update
-
+    t = 1
+    if int(cur_control_ix) == 0:
+        t = 210.0 / 200
     if mouse_pressed == 1:
         # change sliders
         y = (mouse_pos[1] - sliders_y)
@@ -277,7 +281,7 @@ def update_mouse_move(mouse_pos):
         x = (mouse_pos[0] - (controls_x + cur_control_ix * control_w))
         if control_pad <= x <= control_w - control_pad:
             val = float(x - control_pad) / (control_w - control_pad * 2)
-            cur_controls[int(cur_control_ix)] = val
+            cur_controls[int(cur_control_ix)] = val * t
             apply_controls()
 
 
@@ -287,6 +291,8 @@ def draw_controls(screen):
     :param screen:
     :return:
     """
+    #allows for higher threshold
+    t = 200.0 / 210
     for i in range(control_num):
         x = controls_x + i * control_w + control_pad
         y = controls_y + control_pad
@@ -294,8 +300,10 @@ def draw_controls(screen):
         h = control_h - control_pad * 2
         col = control_colors[i]
 
-        pygame.draw.rect(screen, col, (x, y, int(w * cur_controls[i]), h))
+        pygame.draw.rect(screen, col, (x, y, int(w * t * cur_controls[i]), h))
         pygame.draw.rect(screen, (0, 0, 0), (x, y, w, h), 1)
+
+        t = 1
 
 
 def draw_sliders(screen):
@@ -334,7 +342,7 @@ def get_pianoroll_from_notes(notes):
     :param notes:
     :return:
     """
-
+    
     output = np.full((3, int(notes_h), int(notes_w)), 64, dtype=np.uint8)
 
     for i in range(notes_rows):
@@ -344,6 +352,7 @@ def get_pianoroll_from_notes(notes):
             ix = i * notes_cols + j
 
             measure = np.rot90(notes[ix])
+
             played_only = np.where(measure >= note_threshold, 255, 0)
             output[0, y:y + note_h, x:x +
                    note_w] = np.minimum(measure * (255.0 / note_threshold), 255.0)
@@ -396,6 +405,11 @@ def play():
     global cur_controls
     global keyframe_magnitudes
     global blend_slerp
+    global next_threshold
+    global prev_threshold
+    global num_measures
+    global note_h
+    global note_w
 
     print("Keras version: " + keras.__version__)
 
@@ -571,6 +585,12 @@ def play():
                 if event.key == pygame.K_SLASH:
                     current_params *= -1
                     needs_update = True
+                if event.key == pygame.K_UP:
+                    cur_controls[0] = (210.0 - note_threshold + 1) / 200
+                    apply_controls()
+                if event.key == pygame.K_DOWN:
+                    cur_controls[0] = (210.0 - note_threshold - 1) / 200
+                    apply_controls()
                 if event.key == pygame.K_s:  # KEYDOWN S
                     # save slider values
                     audio_pause = True
@@ -630,6 +650,7 @@ def play():
                             cur_controls[x] = float(fo.readline())
                         for x in range(len(current_params)):
                             current_params[x] = float(fo.readline())
+                    apply_controls()
                 if event.key == pygame.K_o:  # KEYDOWN O
 
                     if not songs_loaded:
@@ -801,7 +822,7 @@ if __name__ == "__main__":
             keyframe_params = np.zeros((blendnum,num_params),dtype=np.float32)
             for y in range(blendnum):
                 fileName2 = fo.readline()[:-1]
-                keyframe_paths[y] = fileName
+                keyframe_paths.append(fileName2)
                 fo2 = open("results/history/" + fileName2, "r")
                 if not sub_dir_name == fo2.readline()[:-1]:
                     running = false
@@ -809,9 +830,9 @@ if __name__ == "__main__":
                     break
                 instrument = int(fo2.readline())
                 for x in range(len(cur_controls)):
-                    keyframe_controls[y,x] = float(fo.readline())
+                    keyframe_controls[y,x] = float(fo2.readline())
                 for x in range(len(current_params)):
-                    keyframe_params[y,x] = float(fo.readline())
+                    keyframe_params[y,x] = float(fo2.readline())
         else:
             print(sub_dir_name)
             instrument = int(tempDir)
