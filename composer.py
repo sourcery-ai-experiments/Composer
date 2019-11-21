@@ -30,8 +30,6 @@ num_params = 40
 num_measures = 16
 num_sigmas = 5.0
 note_threshold = 32
-next_threshold = 33
-prev_threshold = 31
 use_pca = True
 is_ae = True
 autosave = False
@@ -405,11 +403,6 @@ def play():
     global cur_controls
     global keyframe_magnitudes
     global blend_slerp
-    global next_threshold
-    global prev_threshold
-    global num_measures
-    global note_h
-    global note_w
 
     print("Keras version: " + keras.__version__)
 
