@@ -13,6 +13,7 @@ from matplotlib import pyplot as plt
 import midi_utils
 import plot_utils
 import models
+import params
 
 import argparse
 
@@ -29,10 +30,10 @@ from keras import backend as K
 from keras.losses import binary_crossentropy
 from keras.optimizers import Adam, RMSprop
 
-EPOCHS_QTY = 3000
+EPOCHS_QTY = 1000
 EPOCHS_TO_SAVE = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450]
 LEARNING_RATE = 0.001  # learning rate
-CONTINUE_TRAIN = False
+CONTINUE_TRAIN = True
 GENERATE_ONLY = False
 
 WRITE_HISTORY = True
@@ -48,7 +49,7 @@ VAE_B2 = 0.1
 
 BATCH_SIZE = 350
 MAX_WINDOWS = 16  # the maximal number of measures a song can have
-LATENT_SPACE_SIZE = 40
+LATENT_SPACE_SIZE = params.num_params
 NUM_OFFSETS = 16 if USE_EMBEDDING else 1
 
 K.set_image_data_format('channels_first')
@@ -253,7 +254,7 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
     #  create model
     if CONTINUE_TRAIN or GENERATE_ONLY:
         print("Loading model...")
-        model = load_model('results/model.h5')
+        model = load_model('results/history/model.h5')
     else:
         print("Building model...")
 

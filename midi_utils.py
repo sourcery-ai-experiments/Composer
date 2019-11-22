@@ -7,13 +7,13 @@ Utils to read and write midi.
 
 from mido import MidiFile, MidiTrack, Message
 import numpy as np
+import params
 
 
-def midi_to_samples(file_name, encode_length=False, num_notes=96, samples_per_measure=96):
+def midi_to_samples(file_name, num_notes=96, samples_per_measure=96):
     """
     Turn a midi file into a sample.
     :param file_name:
-    :param encode_length:
     :param num_notes:
     :param samples_per_measure:
     :return:
@@ -38,6 +38,7 @@ def midi_to_samples(file_name, encode_length=False, num_notes=96, samples_per_me
                 has_time_sig = True
 
     # turn tracks into pianoroll representation
+    maxVol = 1
     all_notes = {}
     for track in mid.tracks:
 
@@ -55,6 +56,9 @@ def midi_to_samples(file_name, encode_length=False, num_notes=96, samples_per_me
                 # we skip notes without a velocity (basically how strong a note is played to make it sound human)
                 if msg.velocity == 0:
                     continue
+                
+                if msg.velocity > maxVol:
+                    maxVol = msg.velocity
 
                 # transform the notes into the 96 heights
                 note = msg.note - (128 - num_notes) / 2
@@ -67,17 +71,18 @@ def midi_to_samples(file_name, encode_length=False, num_notes=96, samples_per_me
                     all_notes[note] = []
                 else:
                     single_note = all_notes[note][-1]
-                    if len(single_note) == 1:
+                    if len(single_note) == 2:
                         single_note.append(single_note[0] + 1)
 
                 # store the time a note has been played
                 all_notes[note].append([abs_time * samples_per_measure / ticks_per_measure])
+                all_notes[note][-1].append(msg.velocity)
 
             # if a note ends
             elif msg.type == 'note_off':
 
                 # if the note has already ended before (note_on, note_off, note_off), we skip the event
-                if len(all_notes[note][-1]) != 1:
+                if len(all_notes[note][-1]) != 2:
                     continue
                 # store the time a note stops playing
                 all_notes[note][-1].append(abs_time * samples_per_measure / ticks_per_measure)
@@ -85,13 +90,15 @@ def midi_to_samples(file_name, encode_length=False, num_notes=96, samples_per_me
     # any note did not end playing, we end it one time tick later
     for note in all_notes:
         for start_end in all_notes[note]:
-            if len(start_end) == 1:
+            if len(start_end) == 2:
                 start_end.append(start_end[0] + 1)
+
+    #print(maxVol)
 
     # put the notes into their respective sample/measure panel (96 x 96)
     samples = []
     for note in all_notes:
-        for start, end in all_notes[note]:
+        for start, vel, end in all_notes[note]:
             sample_ix = int(start / samples_per_measure)  # find the sample/measure this belongs into
             assert (sample_ix < 1024 * 1024)
 
@@ -102,14 +109,18 @@ def midi_to_samples(file_name, encode_length=False, num_notes=96, samples_per_me
             # get sample and find its start to encode the start of the note
             sample = samples[sample_ix]
             start_ix = int(start - sample_ix * samples_per_measure)
-            sample[start_ix, int(note)] = 1
+            sample[start_ix, int(note)] = vel / maxVol if params.encode_volume else 1
+            #print(vel)
+            #print(maxVol)
 
             # play note until it ends if we encode length
-            if encode_length:
+            if params.encode_length:
                 end_ix = min(end - sample_ix * samples_per_measure, samples_per_measure)
                 while start_ix < end_ix:
-                    sample[start_ix, int(note)] = 1
+                    sample[start_ix, int(note)] = vel / maxVol if params.encode_volume else 1
                     start_ix += 1
+            
+                
 
     return samples
 

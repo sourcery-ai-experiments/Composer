@@ -12,6 +12,7 @@ import wave
 import numpy as np
 import pyaudio
 import pygame
+import params
 
 import midi_utils
 
@@ -26,7 +27,7 @@ sample_rate = 48000
 note_dt = 2000  # num samples
 note_duration = 20000  # num samples
 note_decay = 5.0 / sample_rate
-num_params = 40
+num_params = params.num_params
 num_measures = 16
 num_sigmas = 5.0
 note_threshold = 32
@@ -161,13 +162,13 @@ def audio_callback(in_data, frame_count, time_info, status):
             current_notes[measure_ix, note_ix] >= note_threshold)[0]
         for note in notes:
             freq = 2 * 38.89 * pow(2.0, note / 12.0) / sample_rate
-            audio_notes.append((note_time_dt, freq))
+            audio_notes.append((note_time_dt, freq, current_notes[measure_ix, note_ix, note]))
         note_time += 1
         note_time_dt += cur_dt
 
     # generate the tones
     data = np.zeros((frame_count,), dtype=np.float32)
-    for t, f in audio_notes:
+    for t, f, v in audio_notes:
         x = np.arange(audio_time - t, audio_time + frame_count - t)
         x = np.maximum(x, 0)
 
@@ -186,13 +187,15 @@ def audio_callback(in_data, frame_count, time_info, status):
         w[x == 0] = 0
         n = 12 * np.log (f * sample_rate / 38.89) / np.log(2);
         w *= volume * np.exp(-x * note_decay) * pow(balance, (n - 60) / 12.0) / np.log(2)
+        if params.encode_volume:
+            w *= v / 255
         data += w
     data = np.clip(data, -32000, 32000).astype(np.int16)
 
     # remove notes that are too old
     audio_time += frame_count
-    audio_notes = [(t, f)
-                   for t, f in audio_notes if audio_time < t + note_duration]
+    audio_notes = [(t, f, v)
+                   for t, f, v in audio_notes if audio_time < t + note_duration]
     blendfactor = (np.cos( ((note_time / note_h)/num_measures) * math.pi )+1)/2
     #print(blendfactor)
     # reset if loop occurs

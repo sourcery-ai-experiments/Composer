@@ -10,7 +10,7 @@ import os
 import music_utils
 import numpy as np
 import argparse
-
+import params
 
 def preprocess_songs(data_folders):
     """
