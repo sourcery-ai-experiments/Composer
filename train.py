@@ -30,10 +30,10 @@ from keras import backend as K
 from keras.losses import binary_crossentropy
 from keras.optimizers import Adam, RMSprop
 
-EPOCHS_QTY = 1000
+EPOCHS_QTY = 3000
 EPOCHS_TO_SAVE = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450]
 LEARNING_RATE = 0.001  # learning rate
-CONTINUE_TRAIN = True
+CONTINUE_TRAIN = False
 GENERATE_ONLY = False
 
 WRITE_HISTORY = True
@@ -228,7 +228,7 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
     x_orig = np.expand_dims(np.arange(x_shape[0]), axis=-1)
 
     y_shape = (songs_qty * NUM_OFFSETS, MAX_WINDOWS) + y_samples.shape[1:]  # (songs_qty, max number of windows, window pitch qty, window beats per measure)
-    y_orig = np.zeros(y_shape, dtype=y_samples.dtype)  # prepare dataset array
+    y_orig = np.zeros(y_shape, dtype=np.float32)  # prepare dataset array
 
     # fill in measure of songs into input windows for network
     song_start_ix = 0
@@ -271,8 +271,11 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
 
         if USE_VAE:
             model.compile(optimizer=Adam(lr=learning_rate), loss=vae_loss)
+        #elif params.encode_volume:
+            #model.compile(optimizer=RMSprop(lr=learning_rate), loss='mean_squared_logarithmic_error')
         else:
             model.compile(optimizer=RMSprop(lr=learning_rate), loss='binary_crossentropy')
+            #model.compile(optimizer=RMSprop(lr=learning_rate), loss='mean_squared_error')
 
         # plot model with graphvis if installed
         #try:
@@ -314,6 +317,8 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
                 for window_ix in range(MAX_WINDOWS):
                     song_measure_ix = (window_ix + offset) % y_lengths[song_ix]
                     y_train[song_ix, window_ix] = y_samples[song_start_ix + song_measure_ix]
+                    #if params.encode_volume:
+                        #y_train[song_ix, window_ix] /= 100.0
                 song_start_ix = song_end_ix
             assert (song_end_ix == samples_qty)
             offset += 1
