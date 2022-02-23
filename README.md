@@ -4,7 +4,8 @@ Generate tunable music using neural networks.
 Repository to ["Generating Songs With Neural Networks (Neural Composer)"](https://youtu.be/UWxfnNXlVy8).
 
 ## How to install
-* Requires Python 3.5.6 & CUDA 10.0 (for GPU acceleration)
+* Requires Python 3.5.6
+* CUDA 10.0 AND CUDNN 7.6.5 https://developer.nvidia.com/rdp/cudnn-archive
 * Install dependencies in python3 by running `pip install -r requirements.txt`.
 
 ## How to run

@@ -38,8 +38,8 @@ from keras.optimizers import Adam, RMSprop
 # sess = tf.Session(config=config) 
 # K.set_session(sess)
 
-EPOCHS_QTY = 1000
-EPOCHS_TO_SAVE = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450]
+EPOCHS_QTY = 3000
+EPOCHS_TO_SAVE = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450, 800, 1000, 1500, 2000, 2500, 3000]
 LEARNING_RATE = 0.001  # learning rate
 CONTINUE_TRAIN = False
 GENERATE_ONLY = False
