@@ -109,6 +109,7 @@ songs_loaded = False
 # setup audio stream
 audio = pyaudio.PyAudio()
 audio_notes = []
+audio_notes_lengths = {}
 audio_time = 0
 note_time = 0
 note_time_dt = 0
@@ -137,10 +138,12 @@ def audio_callback(in_data, frame_count, time_info, status):
     global blendfactor
     global keyframe_paths
     global balance
+    global audio_notes_lengths
 
     # check if needs restart
     if audio_reset:
         audio_notes = []
+        audio_notes_lengths = {}
         audio_time = 0
         note_time = 0
         note_time_dt = 0
@@ -162,14 +165,23 @@ def audio_callback(in_data, frame_count, time_info, status):
             current_notes[measure_ix, note_ix] >= note_threshold)[0]
         for note in notes:
             freq = 2 * 38.89 * pow(2.0, note / 12.0) / sample_rate
-            audio_notes.append((note_time_dt, freq, current_notes[measure_ix, note_ix, note]))
+            if params.encode_length:
+                if not note in audio_notes_lengths or audio_notes_lengths[note][1] < audio_time:
+                    audio_notes_lengths[note] = (note_time_dt, note_time_dt + note_dt, freq, current_notes[measure_ix, note_ix, note])
+                else:
+                    audio_notes_lengths[note] = (audio_notes_lengths[note][0], note_time_dt + note_dt, freq, current_notes[measure_ix, note_ix, note])
+            else:
+                audio_notes.append((note_time_dt, note_time_dt + note_duration, freq, current_notes[measure_ix, note_ix, note]))
         note_time += 1
         note_time_dt += cur_dt
 
     # generate the tones
     data = np.zeros((frame_count,), dtype=np.float32)
-    for t, f, v in audio_notes:
-        x = np.arange(audio_time - t, audio_time + frame_count - t)
+    for t, e, f, v in audio_notes_lengths if params.encode_volume else audio_notes:
+        if e < audio_time:
+            continue
+        startTime = 0 if params.encode_volume else t;
+        x = np.arange(audio_time - startTime, audio_time + frame_count - startTime)
         x = np.maximum(x, 0)
 
         if instrument == 0:
@@ -181,7 +193,7 @@ def audio_callback(in_data, frame_count, time_info, status):
         elif instrument == 3:
             w = np.sin(x * f * math.pi)  # Sine
         elif instrument == 4:
-            w = -1 * np.sign(np.mod(2*x*f,4)-2) * np.sqrt( 1-( ( np.mod(2*x*f,2)-1) *( ( np.mod(2*x*f,2)-1) ) ))  # Circle
+            w = -1 * np.sign(np.mod(2*x*f,4)-2) * np.sqrt(1-((np.mod(2*x*f,2)-1) * ((np.mod(2*x*f,2)-1))))  # Circle
 
         # w = np.floor(w*8)/8
         w[x == 0] = 0
@@ -194,8 +206,8 @@ def audio_callback(in_data, frame_count, time_info, status):
 
     # remove notes that are too old
     audio_time += frame_count
-    audio_notes = [(t, f, v)
-                   for t, f, v in audio_notes if audio_time < t + note_duration]
+    audio_notes = [(t, e, f, v)
+                   for t, e, f, v in audio_notes if audio_time < t + note_duration]
     blendfactor = (np.cos( ((note_time / note_h)/num_measures) * math.pi )+1)/2
     #print(blendfactor)
     # reset if loop occurs
@@ -204,6 +216,7 @@ def audio_callback(in_data, frame_count, time_info, status):
         note_time = 0
         note_time_dt = 0
         audio_notes = []
+        audio_notes_lengths = {}
         blendstate = (blendstate+1)%(2*len(keyframe_paths))
         #if blendstate == 0:
             #audio_pause = True
@@ -292,7 +305,7 @@ def draw_controls(screen):
     :param screen:
     :return:
     """
-    #allows for higher threshold
+    # allows for higher threshold
     t = 200.0 / 210
     for i in range(control_num):
         x = controls_x + i * control_w + control_pad
@@ -558,7 +571,7 @@ def play():
                             keyframe_paths.append((fileName))
                             fo = open("results/history/" + fileName, "r")
                             if not sub_dir_name == fo.readline()[:-1]:
-                                running = false
+                                running = False
                                 print("incompatable with current model")
                                 break
                             instrument = int(fo.readline())
@@ -617,7 +630,7 @@ def play():
                     fo = open("results/history/" + fileName, "r")
                     print (fo.name)
                     if not sub_dir_name == fo.readline()[:-1]:
-                                running = false
+                                running = False
                                 print("incompatable with current model")
                                 break
                     tempDir = fo.readline()
@@ -778,7 +791,7 @@ def play():
                 latent_x = latent_means + latent_stds * current_params
             latent_x = np.expand_dims(latent_x, axis=0)
             y = decoder([latent_x, 0])[0][0]
-            current_notes = (y * 255.0).astype(np.uint8)
+            current_notes = (y * (255)).astype(np.uint8)
             needs_update = False
 
         # draw GUI to the screen
