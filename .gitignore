@@ -2,3 +2,6 @@ data/*
 config.txt
 history
 results/*
+run.bat
+*.mid
+__pycache__/*

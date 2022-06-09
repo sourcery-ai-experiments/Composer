@@ -14,6 +14,8 @@ import pyaudio
 import pygame
 import params
 
+import os
+
 import midi_utils
 
 import keras
@@ -265,7 +267,7 @@ def apply_controls():
     global balance
 
     note_threshold = (1.0 - cur_controls[0]) * 200 + 10
-    note_dt = (1.0 - cur_controls[1]) * 1800 + 200
+    note_dt = ((1.0 - cur_controls[1]) * 1800 + 200) * params.timeScaleF
     volume = cur_controls[2] * 6000
     balance = pow(2, cur_controls[3] * 4 - 2);
 
@@ -425,7 +427,20 @@ def play():
     K.set_image_data_format('channels_first')
 
     print("Loading encoder...")
-    model = load_model(dir_name + 'model.h5')
+    # priority name.h5 in sub, model.h5 in sub, name.h5 in dir, model.h5 in dir
+    if os.path.isfile(dir_name + sub_dir_name + '/' + sub_dir_name + '.h5'):
+        model = load_model(dir_name + sub_dir_name + '/' + sub_dir_name + '.h5')
+
+    elif os.path.isfile(dir_name + sub_dir_name + '/' + 'model.h5'):
+        model = load_model(dir_name + sub_dir_name + '/' + 'model.h5')
+
+    elif os.path.isfile(dir_name + sub_dir_name + '.h5'):
+        model = load_model(dir_name + sub_dir_name + '.h5')
+
+    else:
+        model = load_model(dir_name + 'model.h5')
+
+
     encoder = Model(inputs=model.input,
                     outputs=model.get_layer('encoder').output)
     decoder = K.function([model.get_layer('decoder').input, K.learning_phase()],
@@ -625,40 +640,7 @@ def play():
                     needs_update = True
                     audio_reset = True
                     fileName = input("File Name to read ")
-                    if "." not in fileName:
-                        fileName = fileName + ".txt"
-                    fo = open("results/history/" + fileName, "r")
-                    print (fo.name)
-                    if not sub_dir_name == fo.readline()[:-1]:
-                                running = false
-                                print("incompatable with current model")
-                                break
-                    tempDir = fo.readline()
-                    if tempDir.startswith("blended song"):
-                        blend = True
-                        blendnum = int(fo.readline())
-                        keyframe_paths = []
-                        keyframe_controls = np.zeros((blendnum,len(cur_controls)),dtype=np.float32)
-                        keyframe_params = np.zeros((blendnum,num_params),dtype=np.float32)
-                        for y in range(blendnum):
-                            fileName2 = fo.readline()[:-1]
-                            keyframe_paths.append(fileName)
-                            fo2 = open("results/history/" + fileName2, "r")
-                            if not sub_dir_name == fo2.readline()[:-1]:
-                                running = false
-                                print("incompatable with current model")
-                                break
-                            instrument = int(fo2.readline())
-                            for x in range(len(cur_controls)):
-                                keyframe_controls[y,x] = float(fo2.readline())
-                            for x in range(len(current_params)):
-                                keyframe_params[y,x] = float(fo2.readline())
-                    else:
-                        instrument = int(tempDir)
-                        for x in range(len(cur_controls)):
-                            cur_controls[x] = float(fo.readline())
-                        for x in range(len(current_params)):
-                            current_params[x] = float(fo.readline())
+                    loadSongFile(fileName)
                     apply_controls()
                 if event.key == pygame.K_o:  # KEYDOWN O
 
@@ -809,6 +791,64 @@ def play():
     audio_stream.close()
     audio.terminate()
 
+def loadSongFile(fileName):
+    global mouse_pressed
+    global current_notes
+    global audio_pause
+    global needs_update
+    global current_params
+    global prev_mouse_pos
+    global audio_reset
+    global instrument
+    global songs_loaded
+    global autosavenow
+    global autosavenum
+    global autosave
+    global blend
+    global blendstate
+    global blendfactor
+    global keyframe_params
+    global keyframe_controls
+    global keyframe_paths
+    global cur_controls
+    global keyframe_magnitudes
+    global blend_slerp
+
+    if "." not in fileName:
+        fileName = fileName + ".txt"
+    fo = open("results/history/" + fileName, "r")
+    print (fo.name)
+    if not sub_dir_name == fo.readline()[:-1]:
+        running = false
+        print("incompatable with current model")
+        return
+    tempDir = fo.readline()
+    if tempDir.startswith("blended song"):
+        blend = True
+        blendnum = int(fo.readline())
+        keyframe_paths = []
+        keyframe_controls = np.zeros((blendnum,len(cur_controls)),dtype=np.float32)
+        keyframe_params = np.zeros((blendnum,num_params),dtype=np.float32)
+        for y in range(blendnum):
+            fileName2 = fo.readline()[:-1]
+            keyframe_paths.append(fileName)
+            fo2 = open("results/history/" + fileName2, "r")
+            if not sub_dir_name == fo2.readline()[:-1]:
+                running = false
+                print("incompatable with current model")
+                return
+            instrument = int(fo2.readline())
+            for x in range(len(cur_controls)):
+                keyframe_controls[y,x] = float(fo2.readline())
+            for x in range(len(current_params)):
+                keyframe_params[y,x] = float(fo2.readline())
+    else:
+        print(tempDir)
+        instrument = int(tempDir)
+        for x in range(len(cur_controls)):
+            cur_controls[x] = float(fo.readline())
+        for x in range(len(current_params)):
+            current_params[x] = float(fo.readline())
 
 if __name__ == "__main__":
     # configure parser and parse arguments
@@ -822,33 +862,8 @@ if __name__ == "__main__":
         fo = open("results/history/" + args.model_path, "r")
         print (fo.name)
         sub_dir_name = fo.readline()[:-1]
-        tempDir = fo.readline()
-        if tempDir.startswith("blended song"):
-            blend = True
-            blendnum = int(fo.readline())
-            keyframe_paths = []
-            keyframe_controls = np.zeros((blendnum,len(cur_controls)),dtype=np.float32)
-            keyframe_params = np.zeros((blendnum,num_params),dtype=np.float32)
-            for y in range(blendnum):
-                fileName2 = fo.readline()[:-1]
-                keyframe_paths.append(fileName2)
-                fo2 = open("results/history/" + fileName2, "r")
-                if not sub_dir_name == fo2.readline()[:-1]:
-                    running = false
-                    print("incompatable with current model")
-                    break
-                instrument = int(fo2.readline())
-                for x in range(len(cur_controls)):
-                    keyframe_controls[y,x] = float(fo2.readline())
-                for x in range(len(current_params)):
-                    keyframe_params[y,x] = float(fo2.readline())
-        else:
-            print(sub_dir_name)
-            instrument = int(tempDir)
-            for x in range(len(cur_controls)):
-                cur_controls[x] = float(fo.readline())
-            for x in range(len(current_params)):
-                current_params[x] = float(fo.readline())
+        fo.close()
+        loadSongFile(args.model_path)
         
     else:
         sub_dir_name = args.model_path

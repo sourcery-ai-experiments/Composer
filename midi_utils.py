@@ -22,7 +22,7 @@ def midi_to_samples(file_name, num_notes=96, samples_per_measure=96):
     mid = MidiFile(file_name)
 
     ticks_per_beat = mid.ticks_per_beat  # get ticks per beat
-    ticks_per_measure = 4 * ticks_per_beat  # get ticks per measure
+    ticks_per_measure = 4 * ticks_per_beat # get ticks per measure
 
     # detect the time signature of the midi
     for track in mid.tracks:
@@ -36,6 +36,8 @@ def midi_to_samples(file_name, num_notes=96, samples_per_measure=96):
 
                 ticks_per_measure = new_tpm
                 has_time_sig = True
+
+    ticks_per_measure = ticks_per_measure * params.timeScaleF
 
     # turn tracks into pianoroll representation
     maxVol = 1
@@ -109,7 +111,7 @@ def midi_to_samples(file_name, num_notes=96, samples_per_measure=96):
             # get sample and find its start to encode the start of the note
             sample = samples[sample_ix]
             start_ix = int(start - sample_ix * samples_per_measure)
-            sample[start_ix, int(note)] = vel / maxVol if params.encode_volume else 1
+            sample[start_ix, int(note)] = vel if params.encode_volume else 1
             #print(vel)
             #print(maxVol)
 
@@ -117,7 +119,7 @@ def midi_to_samples(file_name, num_notes=96, samples_per_measure=96):
             if params.encode_length:
                 end_ix = min(end - sample_ix * samples_per_measure, samples_per_measure)
                 while start_ix < end_ix:
-                    sample[start_ix, int(note)] = vel / maxVol if params.encode_volume else 1
+                    sample[start_ix, int(note)] = vel if params.encode_volume else 1
                     start_ix += 1
             
                 
@@ -143,6 +145,7 @@ def samples_to_midi(samples, file_name, threshold=0.5, num_notes=96, samples_per
 
     ticks_per_beat = mid.ticks_per_beat
     ticks_per_measure = 4 * ticks_per_beat
+    ticks_per_measure = ticks_per_measure * params.timeScaleF
     ticks_per_sample = ticks_per_measure / samples_per_measure
 
     # add instrument for track

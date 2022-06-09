@@ -8,7 +8,9 @@ Train an autoencoder model to learn to encode songs.
 import random
 
 import numpy as np
-from matplotlib import pyplot as plt
+#import matplotlib
+#import matplotlib.pyplot as plt
+#from matplotlib import pyplot as plt
 
 import midi_utils
 import plot_utils
@@ -30,10 +32,10 @@ from keras import backend as K
 from keras.losses import binary_crossentropy
 from keras.optimizers import Adam, RMSprop
 
-EPOCHS_QTY = 3000
+EPOCHS_QTY = 200
 EPOCHS_TO_SAVE = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450]
-LEARNING_RATE = 0.001  # learning rate
-CONTINUE_TRAIN = False
+LEARNING_RATE = 0.001 / 5  # learning rate
+CONTINUE_TRAIN = True
 GENERATE_ONLY = False
 
 WRITE_HISTORY = True
@@ -81,17 +83,17 @@ def plot_losses(scores, f_name, on_top=True):
     :param on_top:
     :return:
     """
-    plt.clf()
-    ax = plt.gca()
-    ax.yaxis.tick_right()
-    ax.yaxis.set_ticks_position('both')
-    ax.yaxis.grid(True)
-    plt.plot(scores)
-    plt.ylim([0.0, 0.009])
-    plt.xlabel('Epoch')
-    loc = ('upper right' if on_top else 'lower right')
-    plt.draw()
-    plt.savefig(f_name)
+    #plt.clf()
+    #ax = plt.gca()
+    #ax.yaxis.tick_right()
+    #ax.yaxis.set_ticks_position('both')
+    #ax.yaxis.grid(True)
+    #plt.plot(scores)
+    #plt.ylim([0.0, 0.009])
+    #plt.xlabel('Epoch')
+    #loc = ('upper right' if on_top else 'lower right')
+    #plt.draw()
+    #plt.savefig(f_name)
 
 
 def save_training_config(num_songs, model, learning_rate):
@@ -176,24 +178,24 @@ def generate_normalized_random_songs(x_orig, y_orig, encoder, decoder, random_ve
     if '/' in write_dir:
         title = 'Epoch: ' + write_dir.split('/')[-2][1:]
 
-    plt.clf()
+    #plt.clf()
     pca_values[::-1].sort()
-    plt.title(title)
-    plt.bar(np.arange(pca_values.shape[0]), pca_values, align='center')
-    plt.draw()
-    plt.savefig(write_dir + 'latent_pca_values.png')
+    #plt.title(title)
+    #plt.bar(np.arange(pca_values.shape[0]), pca_values, align='center')
+    #plt.draw()
+    #plt.savefig(write_dir + 'latent_pca_values.png')
 
-    plt.clf()
-    plt.title(title)
-    plt.bar(np.arange(pca_values.shape[0]), latent_mean, align='center')
-    plt.draw()
-    plt.savefig(write_dir + 'latent_means.png')
+    #plt.clf()
+    #plt.title(title)
+    #plt.bar(np.arange(pca_values.shape[0]), latent_mean, align='center')
+    #plt.draw()
+    #plt.savefig(write_dir + 'latent_means.png')
 
-    plt.clf()
-    plt.title(title)
-    plt.bar(np.arange(pca_values.shape[0]), latent_stds, align='center')
-    plt.draw()
-    plt.savefig(write_dir + 'latent_stds.png')
+    #plt.clf()
+    #plt.title(title)
+    #plt.bar(np.arange(pca_values.shape[0]), latent_stds, align='center')
+    #plt.draw()
+    #plt.savefig(write_dir + 'latent_stds.png')
 
 
 def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/lengths.npy', epochs_qty=EPOCHS_QTY, learning_rate=LEARNING_RATE):
