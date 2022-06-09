@@ -77,9 +77,6 @@ Exclusive to this fork
 			Example result in blended song.mp3 which was recorded with audacity
 			https://drive.google.com/file/d/17MNTsHMXghApAa_GcUMB-pY0PTWWRnIF/view?usp=sharing
 
-I would have liked the text entry to be in a box to the right of the notes rather than in command line, but I couldn't figure out how to do that
-If you can help with that please make a pull request and email me at
-michael_einhorn@yahoo.com
 	 
 ```
 
