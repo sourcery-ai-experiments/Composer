@@ -2,32 +2,29 @@
 # -*- coding: utf-8 -*-
 
 """
-Train an autoencoder model to learn to encode songs.
+Train an auto-encoder model to learn to encode songs.
 """
 
+
+import argparse
 import random
 
 import numpy as np
-#import matplotlib
-#import matplotlib.pyplot as plt
-#from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt
 
 import midi_utils
-import plot_utils
 import models
 import params
-
-import argparse
+import plot_utils
 
 #  Load Keras
 print("Loading keras...")
 import os
 import keras
 
-print("Keras version: " + keras.__version__)
+print(f"Keras version: {keras.__version__}")
 
 from keras.models import Model, load_model
-#from keras.utils import plot_model
 from keras import backend as K
 from keras.losses import binary_crossentropy
 from keras.optimizers import Adam, RMSprop
@@ -43,7 +40,7 @@ NUM_RAND_SONGS = 10
 
 # network params
 DROPOUT_RATE = 0.1
-BATCHNORM_MOMENTUM = 0.9  # weighted normalization with the past
+BATCHNORM_MOMENTUM: float = 0.9  # weighted normalization with the past
 USE_EMBEDDING = False
 USE_VAE = False
 VAE_B1 = 0.02
@@ -83,20 +80,21 @@ def plot_losses(scores, f_name, on_top=True):
     :param on_top:
     :return:
     """
-    #plt.clf()
-    #ax = plt.gca()
-    #ax.yaxis.tick_right()
-    #ax.yaxis.set_ticks_position('both')
-    #ax.yaxis.grid(True)
-    #plt.plot(scores)
-    #plt.ylim([0.0, 0.009])
-    #plt.xlabel('Epoch')
-    #loc = ('upper right' if on_top else 'lower right')
-    #plt.draw()
-    #plt.savefig(f_name)
+    plt.clf()
+    ax = plt.gca()
+    ax.yaxis.tick_right()
+    ax.yaxis.set_ticks_position('both')
+    ax.yaxis.grid(True)
+    plt.plot(scores)
+    plt.ylim([0.0, 0.009])
+    plt.xlabel('Epoch')
+    loc = ('upper right' if on_top else 'lower right')
+    plt.draw()
+    plt.savefig(f_name)
 
 
 def save_training_config(num_songs, model, learning_rate):
+    # sourcery skip: use-fstring-for-concatenation
     """
     Save configuration of training.
     :param num_songs:
@@ -174,28 +172,25 @@ def generate_normalized_random_songs(x_orig, y_orig, encoder, decoder, random_ve
     latent_vectors = latent_mean + np.dot(random_vectors * pca_values, pca_vectors)
     generate_random_songs(decoder, write_dir, latent_vectors)
 
-    title = ''
-    if '/' in write_dir:
-        title = 'Epoch: ' + write_dir.split('/')[-2][1:]
-
-    #plt.clf()
+    title = 'Epoch: ' + write_dir.split('/')[-2][1:] if '/' in write_dir else ''
+    plt.clf()
     pca_values[::-1].sort()
-    #plt.title(title)
-    #plt.bar(np.arange(pca_values.shape[0]), pca_values, align='center')
-    #plt.draw()
-    #plt.savefig(write_dir + 'latent_pca_values.png')
+    plt.title(title)
+    plt.bar(np.arange(pca_values.shape[0]), pca_values, align='center')
+    plt.draw()
+    plt.savefig(write_dir + 'latent_pca_values.png')
 
-    #plt.clf()
-    #plt.title(title)
-    #plt.bar(np.arange(pca_values.shape[0]), latent_mean, align='center')
-    #plt.draw()
-    #plt.savefig(write_dir + 'latent_means.png')
+    plt.clf()
+    plt.title(title)
+    plt.bar(np.arange(pca_values.shape[0]), latent_mean, align='center')
+    plt.draw()
+    plt.savefig(write_dir + 'latent_means.png')
 
-    #plt.clf()
-    #plt.title(title)
-    #plt.bar(np.arange(pca_values.shape[0]), latent_stds, align='center')
-    #plt.draw()
-    #plt.savefig(write_dir + 'latent_stds.png')
+    plt.clf()
+    plt.title(title)
+    plt.bar(np.arange(pca_values.shape[0]), latent_stds, align='center')
+    plt.draw()
+    plt.savefig(write_dir + 'latent_stds.png')
 
 
 def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/lengths.npy', epochs_qty=EPOCHS_QTY, learning_rate=LEARNING_RATE):
