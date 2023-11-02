@@ -291,9 +291,7 @@ def update_mouse_move(mouse_pos):
     :return:
     """
     global needs_update
-    t = 1
-    if int(cur_control_ix) == 0:
-        t = 210.0 / 200
+    t = 210.0 / 200 if int(cur_control_ix) == 0 else 1
     if mouse_pressed == 1:
         # change sliders
         y = (mouse_pos[1] - sliders_y)
