@@ -20,14 +20,10 @@ import plot_utils
 #  Load Keras
 print("Loading keras...")
 import os
-import keras
-
-print(f"Keras version: {keras.__version__}")
-
-from keras.models import Model, load_model
-from keras import backend as K
-from keras.losses import binary_crossentropy
-from keras.optimizers import Adam, RMSprop
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 
 EPOCHS_QTY = 200
 EPOCHS_TO_SAVE = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450]
@@ -253,7 +249,7 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
     #  create model
     if CONTINUE_TRAIN or GENERATE_ONLY:
         print("Loading model...")
-        model = load_model('results/history/model.h5')
+        model = torch.load('results/history/model.pth')
     else:
         print("Building model...")
 
@@ -340,7 +336,7 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
                 if not os.path.exists(write_dir):
                     os.makedirs(write_dir)
                 write_dir += '/'
-                model.save('results/history/model.h5')
+                torch.save(model.state_dict(), 'results/history/model.pth')
             else:
                 model.save('results/model.h5')
 

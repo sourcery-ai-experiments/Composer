@@ -5,11 +5,9 @@
 The models used for music generation.
 """
 
-from keras import backend as K
-from keras.layers import Input, Dense, Activation, Dropout, Flatten, Reshape, TimeDistributed, Lambda
-from keras.layers.embeddings import Embedding
-from keras.layers.normalization import BatchNormalization
-from keras.models import Model
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 import params
 
