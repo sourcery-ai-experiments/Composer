@@ -76,10 +76,6 @@ Exclusive to this fork
 	 'B' - Blends smoothly through a series of preset songs by taking a linear combination of the latent vectors. Sounds awesome.
 			asks in command line what song files (created by the S command above) to blend
 
-
-I would have liked the text entry to be in a box to the right of the notes rather than in command line, but I couldn't figure out how to do that
-If you can help with that please make a pull request and email me at
-michael_einhorn@yahoo.com
 	 
 ```
 

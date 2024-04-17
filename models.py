@@ -11,9 +11,6 @@ import torch.nn as nn
 import params
 
 
-
-import params
-
 def vae_sampling(args):
     z_mean, z_log_sigma_sq, vae_b1 = args
     epsilon = K.random_normal(shape=K.shape(z_mean), mean=0.0, stddev=vae_b1)
@@ -106,7 +103,7 @@ class AutoencoderModel(nn.Module):
     #if params.encode_volume:
         #x = TimeDistributed(Dense(input_shape[1] * input_shape[2]))(x)
     #else:
-    
+
     x = TimeDistributed(Dense(input_shape[1] * input_shape[2], activation='sigmoid'))(x)
     print(K.int_shape(x))
     x = Reshape((input_shape[0], input_shape[1], input_shape[2]))(x)
