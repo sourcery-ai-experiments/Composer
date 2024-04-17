@@ -4,17 +4,18 @@ Generate tunable music using neural networks.
 Repository to ["Generating Songs With Neural Networks (Neural Composer)"](https://youtu.be/UWxfnNXlVy8).
 
 ## How to install
-
+* Requires Python 3.5.6
+* CUDA 10.0 AND CUDNN 7.6.5 https://developer.nvidia.com/rdp/cudnn-archive
 * Install dependencies in python3 by running `pip install -r requirements.txt`.
 
 ## How to run
 
-* Find some dataset to train on. More info on where to find datasets can be found in data/raw/README.md. A default bach dataset is included in the repository.
-* Run preprocess_songs.py. This will load all midi files from your midi files folder data/raw/ into data/interim/samples.npy & lengths.npy.
-  You can point the script to a location using the --data_folder flag one or multiple times to make it include more paths to  index midi files.
-* Run train.py. This will train your network and store the progress from time to time (EPOCHS_TO_SAVE to change storing frequency).
-  Only stops if you interrupt it or after 2000 epochs.
-* Run composer.py --model_path "e300" where "e300" indicates the folder the stored model is in. Look into the results/history folder to find your trained model folders.
+* Find some dataset to train on. More info on where to find datasets can be found in `data/raw/README.md`. A default bach dataset is included in the repository.
+* Run `preprocess_songs.py`. This will load all midi files from your midi files folder `data/raw/` into `data/interim/samples.npy` & `lengths.npy`.
+  You can point the script to a location using the `--data_folder` flag one or multiple times to make it include more paths to index midi files.
+* Run `train.py`. This will train your network and store the progress from time to time (EPOCHS_TO_SAVE to change storing frequency).
+  Only stops if you interrupt it or after 2000 epochs. You need to change "CONTINUE_TRAIN" to False to start training from scratch.
+* Run `composer.py --model_path "e300"` where `"e300"` indicates the folder the stored model is in. Look into the `results/history` folder to find your trained model folders.
 
 ## Composer
 
@@ -74,8 +75,6 @@ Exclusive to this fork
 			Could be useful if you are listening while doing something else and want to look back on the history.
 	 'B' - Blends smoothly through a series of preset songs by taking a linear combination of the latent vectors. Sounds awesome.
 			asks in command line what song files (created by the S command above) to blend
-			Example result in blended song.mp3 which was recorded with audacity
-			https://drive.google.com/file/d/17MNTsHMXghApAa_GcUMB-pY0PTWWRnIF/view?usp=sharing
 
 	 
 ```
@@ -87,4 +86,8 @@ link below and extract it into the results/history folder of your project. The z
 named e and some number, indicating the number of epochs the model was trained and some model.h5.
 Pay attention when extracting the model not to override one of your own trained, most beloved models!
 
-* Bach dataset: https://drive.google.com/open?id=1P_hOF0v55m1Snzvri5OBVP5yy099Lzgx
+40 params, trained with 0.0002 noise
+https://drive.google.com/open?id=1J_AHhXavLf_bQgmd1j8MpuMMSqhmKGpW
+
+Data set
+https://www.ninsheetmusic.org/
