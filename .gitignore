@@ -5,3 +5,7 @@ results/*
 run.bat
 *.mid
 __pycache__/*
+cuda10.dockerfile
+docker-compose.yml
+Dockerfile
+

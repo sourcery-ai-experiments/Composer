@@ -195,7 +195,7 @@ def audio_callback(in_data, frame_count, time_info, status):
         elif instrument == 3:
             w = np.sin(x * f * math.pi)  # Sine
         elif instrument == 4:
-            w = -1 * np.sign(np.mod(2*x*f,4)-2) * np.sqrt( 1-( ( np.mod(2*x*f,2)-1) *( ( np.mod(2*x*f,2)-1) ) ))  # Circle
+            w = -1 * np.sign(np.mod(2*x*f,4)-2) * np.sqrt(1-((np.mod(2*x*f,2)-1) * ((np.mod(2*x*f,2)-1))))  # Circle
 
         # w = np.floor(w*8)/8
         w[x == 0] = 0
@@ -307,7 +307,7 @@ def draw_controls(screen):
     :param screen:
     :return:
     """
-    #allows for higher threshold
+    # allows for higher threshold
     t = 200.0 / 210
     for i in range(control_num):
         x = controls_x + i * control_w + control_pad
@@ -586,7 +586,7 @@ def play():
                             keyframe_paths.append((fileName))
                             fo = open("results/history/" + fileName, "r")
                             if not sub_dir_name == fo.readline()[:-1]:
-                                running = false
+                                running = False
                                 print("incompatable with current model")
                                 break
                             instrument = int(fo.readline())
@@ -640,8 +640,45 @@ def play():
                     needs_update = True
                     audio_reset = True
                     fileName = input("File Name to read ")
-                    loadSongFile(fileName)
+                    
+                    if "." not in fileName:
+                        fileName = fileName + ".txt"
+                    fo = open("results/history/" + fileName, "r")
+                    print (fo.name)
+                    if not sub_dir_name == fo.readline()[:-1]:
+                                running = False
+                                print("incompatable with current model")
+                                break
+                    tempDir = fo.readline()
+                    
+                    if tempDir.startswith("blended song"):
+                        blend = True
+                        blendnum = int(fo.readline())
+                        keyframe_paths = []
+                        keyframe_controls = np.zeros((blendnum,len(cur_controls)),dtype=np.float32)
+                        keyframe_params = np.zeros((blendnum,num_params),dtype=np.float32)
+                        for y in range(blendnum):
+                            fileName2 = fo.readline()[:-1]
+                            keyframe_paths.append(fileName)
+                            fo2 = open("results/history/" + fileName2, "r")
+                            if not sub_dir_name == fo2.readline()[:-1]:
+                                running = false
+                                print("incompatable with current model")
+                                break
+                            instrument = int(fo2.readline())
+                            for x in range(len(cur_controls)):
+                                keyframe_controls[y,x] = float(fo2.readline())
+                            for x in range(len(current_params)):
+                                keyframe_params[y,x] = float(fo2.readline())
+                    else:
+                        instrument = int(tempDir)
+                        for x in range(len(cur_controls)):
+                            cur_controls[x] = float(fo.readline())
+                        for x in range(len(current_params)):
+                            current_params[x] = float(fo.readline())
+                            
                     apply_controls()
+                    
                 if event.key == pygame.K_o:  # KEYDOWN O
 
                     if not songs_loaded:
