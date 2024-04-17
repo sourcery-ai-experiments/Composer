@@ -20,20 +20,17 @@ import argparse
 #  Load Keras
 print("Loading keras...")
 import os
-import keras
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.utils.data
 
-print("Keras version: " + keras.__version__)
-
-from keras.models import Model, load_model
-#from keras.utils import plot_model
-from keras import backend as K
-from keras.losses import binary_crossentropy
-from keras.optimizers import Adam, RMSprop
+# Removed Keras version print as it's no longer relevant
+# Removed Keras specific imports
 
 # import tensorflow as tf
 # from tensorflow.python.client import device_lib
 # print(device_lib.list_local_devices())
-
 # config = tf.ConfigProto( device_count = {'GPU': 1 , 'CPU': 56} ) 
 # sess = tf.Session(config=config) 
 # K.set_session(sess)
@@ -222,8 +219,22 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
         print('No input data found, run preprocess_songs.py first.')
         exit(1)
 
-    y_samples = np.load(samples_path)
-    y_lengths = np.load(lengths_path)
+    # Replaced numpy loading with PyTorch DataLoader
+    # Define custom Dataset class
+    class MidiDataset(torch.utils.data.Dataset):
+        def __init__(self, samples_path, lengths_path):
+            self.y_samples = torch.from_numpy(np.load(samples_path)).float()
+            self.y_lengths = torch.from_numpy(np.load(lengths_path)).long()
+
+        def __len__(self):
+            return len(self.y_lengths)
+
+        def __getitem__(self, idx):
+            return self.y_samples[idx], self.y_lengths[idx]
+
+    # Instantiate the dataset and DataLoader
+    dataset = MidiDataset(samples_path, lengths_path)
+    data_loader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     samples_qty = y_samples.shape[0]
     songs_qty = y_lengths.shape[0]
@@ -236,7 +247,7 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
     x_orig = np.expand_dims(np.arange(x_shape[0]), axis=-1)
 
     y_shape = (songs_qty * NUM_OFFSETS, MAX_WINDOWS) + y_samples.shape[1:]  # (songs_qty, max number of windows, window pitch qty, window beats per measure)
-    y_orig = np.zeros(y_shape, dtype=y_samples.dtype)  # prepare dataset array
+    y_orig = np.zeros(y_shape, dtype=np.float32)  # prepare dataset array
 
     # fill in measure of songs into input windows for network
     song_start_ix = 0
@@ -279,8 +290,11 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
 
         if USE_VAE:
             model.compile(optimizer=Adam(lr=learning_rate), loss=vae_loss)
+        #elif params.encode_volume:
+            #model.compile(optimizer=RMSprop(lr=learning_rate), loss='mean_squared_logarithmic_error')
         else:
             model.compile(optimizer=RMSprop(lr=learning_rate), loss='binary_crossentropy')
+            #model.compile(optimizer=RMSprop(lr=learning_rate), loss='mean_squared_error')
 
         # plot model with graphvis if installed
         #try:
@@ -322,6 +336,8 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
                 for window_ix in range(MAX_WINDOWS):
                     song_measure_ix = (window_ix + offset) % y_lengths[song_ix]
                     y_train[song_ix, window_ix] = y_samples[song_start_ix + song_measure_ix]
+                    #if params.encode_volume:
+                        #y_train[song_ix, window_ix] /= 100.0
                 song_start_ix = song_end_ix
             assert (song_end_ix == samples_qty)
             offset += 1
