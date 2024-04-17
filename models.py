@@ -48,6 +48,13 @@ class AutoencoderModel(nn.Module):
         x = Reshape((input_shape[0], -1))(x_in)
         print(K.int_shape(x))
 
+        if params.noise_rate > 0:
+            x = Lambda(lambda x: 1 - x)(x)
+            x = Dropout(params.noise_rate)(x)
+            x = Lambda(lambda x: 1 - x)(x)
+
+        print(K.int_shape(x))
+        
         x = TimeDistributed(Dense(2000, activation='relu'))(x)
         print(K.int_shape(x))
 
@@ -94,7 +101,11 @@ class AutoencoderModel(nn.Module):
         x = Dropout(dropout_rate)(x)
     print(K.int_shape(x))
 
+    
+    #if params.encode_volume:
+        #x = TimeDistributed(Dense(input_shape[1] * input_shape[2]))(x)
     #else:
+
     x = TimeDistributed(Dense(input_shape[1] * input_shape[2], activation='sigmoid'))(x)
     print(K.int_shape(x))
     x = Reshape((input_shape[0], input_shape[1], input_shape[2]))(x)

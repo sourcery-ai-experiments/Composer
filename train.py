@@ -18,19 +18,28 @@ import params
 import plot_utils
 
 #  Load Keras
-print("Loading keras...")
 import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import torch.utils.data
 
-EPOCHS_QTY = 200
-EPOCHS_TO_SAVE = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450]
+# Removed Keras version print as it's no longer relevant
+# Removed Keras specific imports
+
+# import tensorflow as tf
+# from tensorflow.python.client import device_lib
+# print(device_lib.list_local_devices())
+# config = tf.ConfigProto( device_count = {'GPU': 1 , 'CPU': 56} ) 
+# sess = tf.Session(config=config) 
+# K.set_session(sess)
+
+EPOCHS_QTY = 3000
+EPOCHS_TO_SAVE = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450, 800, 1000, 1500, 2000, 2500, 3000]
+GENERATE_ONLY = False
 LEARNING_RATE = 0.001 / 5  # learning rate
 CONTINUE_TRAIN = True
-GENERATE_ONLY = False
-
 WRITE_HISTORY = True
 NUM_RAND_SONGS = 10
 
@@ -209,8 +218,22 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
         print('No input data found, run preprocess_songs.py first.')
         exit(1)
 
-    y_samples = np.load(samples_path)
-    y_lengths = np.load(lengths_path)
+    # Replaced numpy loading with PyTorch DataLoader
+    # Define custom Dataset class
+    class MidiDataset(torch.utils.data.Dataset):
+        def __init__(self, samples_path, lengths_path):
+            self.y_samples = torch.from_numpy(np.load(samples_path)).float()
+            self.y_lengths = torch.from_numpy(np.load(lengths_path)).long()
+
+        def __len__(self):
+            return len(self.y_lengths)
+
+        def __getitem__(self, idx):
+            return self.y_samples[idx], self.y_lengths[idx]
+
+    # Instantiate the dataset and DataLoader
+    dataset = MidiDataset(samples_path, lengths_path)
+    data_loader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     samples_qty = y_samples.shape[0]
     songs_qty = y_lengths.shape[0]
@@ -274,6 +297,9 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
 
         # plot model with graphvis if installed
         #try:
+        #     plot_model(model, to_file='results/model.png', show_shapes=True)
+        #except OSError as e:
+        #    print(e)
     #  train
     print("Referencing sub-models...")
     decoder = K.function([model.get_layer('decoder').input, K.learning_phase()], [model.layers[-1].output])

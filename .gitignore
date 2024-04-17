@@ -13,3 +13,6 @@ __pycache__/*
 .vs/VSWorkspaceState.json
 /.vscode/settings.json
 slnx.sqlite
+cuda10.dockerfile
+docker-compose.yml
+Dockerfile
