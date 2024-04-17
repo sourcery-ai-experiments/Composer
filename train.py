@@ -278,6 +278,9 @@ def train(samples_path='data/interim/samples.npy', lengths_path='data/interim/le
 
         # plot model with graphvis if installed
         #try:
+        #     plot_model(model, to_file='results/model.png', show_shapes=True)
+        #except OSError as e:
+        #    print(e)
     #  train
     print("Referencing sub-models...")
     decoder = K.function([model.get_layer('decoder').input, K.learning_phase()], [model.layers[-1].output])
