@@ -8,6 +8,8 @@ The models used for music generation.
 import torch
 import torch.nn as nn
 
+import params
+
 
 
 import params
@@ -54,6 +56,7 @@ class AutoencoderModel(nn.Module):
             x = Lambda(lambda x: 1 - x)(x)
 
         print(K.int_shape(x))
+        
         x = TimeDistributed(Dense(2000, activation='relu'))(x)
         print(K.int_shape(x))
 
@@ -102,7 +105,8 @@ class AutoencoderModel(nn.Module):
 
     #if params.encode_volume:
         #x = TimeDistributed(Dense(input_shape[1] * input_shape[2]))(x)
-    #else:        
+    #else:
+    
     x = TimeDistributed(Dense(input_shape[1] * input_shape[2], activation='sigmoid'))(x)
     print(K.int_shape(x))
     x = Reshape((input_shape[0], input_shape[1], input_shape[2]))(x)

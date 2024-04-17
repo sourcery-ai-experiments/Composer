@@ -75,8 +75,7 @@ Exclusive to this fork
 			Could be useful if you are listening while doing something else and want to look back on the history.
 	 'B' - Blends smoothly through a series of preset songs by taking a linear combination of the latent vectors. Sounds awesome.
 			asks in command line what song files (created by the S command above) to blend
-			Example result in blended song.mp3 which was recorded with audacity
-			https://drive.google.com/file/d/17MNTsHMXghApAa_GcUMB-pY0PTWWRnIF/view?usp=sharing
+
 
 I would have liked the text entry to be in a box to the right of the notes rather than in command line, but I couldn't figure out how to do that
 If you can help with that please make a pull request and email me at
@@ -91,4 +90,8 @@ link below and extract it into the results/history folder of your project. The z
 named e and some number, indicating the number of epochs the model was trained and some model.h5.
 Pay attention when extracting the model not to override one of your own trained, most beloved models!
 
-* Bach dataset: https://drive.google.com/open?id=1P_hOF0v55m1Snzvri5OBVP5yy099Lzgx
+40 params, trained with 0.0002 noise
+https://drive.google.com/open?id=1J_AHhXavLf_bQgmd1j8MpuMMSqhmKGpW
+
+Data set
+https://www.ninsheetmusic.org/
