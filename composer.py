@@ -450,7 +450,6 @@ def play():
 
     model = torch.load(model_path)
     model.eval()
-    model.eval()
     # Using PyTorch model directly for both encoding and decoding
     encoder = model.encoder
     decoder = model.decoder
