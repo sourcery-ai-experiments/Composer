@@ -7,7 +7,6 @@ The models used for music generation.
 
 import torch
 import torch.nn as nn
-
 import params
 
 
